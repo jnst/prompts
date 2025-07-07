@@ -60,23 +60,31 @@ export function validateTomlStructure(data: unknown): data is TomlData {
 		return false;
 	}
 
-	const obj = data as Record<string, unknown>;
+	// Use explicit interface to avoid index signature issues
+	const obj = data as {
+		prompt?: unknown;
+		changelog?: unknown;
+	};
 
 	// Check prompt section
-	if (!obj['prompt'] || typeof obj['prompt'] !== 'object') {
+	if (!obj.prompt || typeof obj.prompt !== 'object') {
 		return false;
 	}
 
-	const prompt = obj['prompt'] as Record<string, unknown>;
+	const prompt = obj.prompt as {
+		template?: unknown;
+		version?: unknown;
+	};
+
 	if (
-		typeof prompt['template'] !== 'string' ||
-		typeof prompt['version'] !== 'string'
+		typeof prompt.template !== 'string' ||
+		typeof prompt.version !== 'string'
 	) {
 		return false;
 	}
 
 	// Changelog is optional
-	if (obj['changelog'] && !Array.isArray(obj['changelog'])) {
+	if (obj.changelog && !Array.isArray(obj.changelog)) {
 		return false;
 	}
 
