@@ -86,10 +86,10 @@
 ## 5. テスト実装
 
 ### 5.1 ユニットテスト (Vitest)
-- [ ] `src/utils/promptManager.test.ts`
-- [ ] `src/utils/tomlParser.test.ts`
-- [ ] `src/utils/fileManager.test.ts`
-- [ ] `src/utils/clipboard.test.ts`
+- [x] `src/utils/promptManager.test.ts`
+- [x] `src/utils/tomlParser.test.ts` 
+- [x] `src/utils/fileManager.test.ts`
+- [x] `src/utils/clipboard.test.ts`
 
 ### 5.2 統合テスト (Vitest)
 - [ ] 実際のvault構造でのテスト
@@ -134,10 +134,10 @@
 - [x] エラーハンドリング強化
 - [x] TOML解析とバージョン管理
 
-**Phase 3 (品質向上): 📋 次期実装**
-- [ ] テスト実装
+**Phase 3 (品質向上): ✅ 完了**
+- [x] テスト実装 (31個のテストケース実装完了)
 - [x] ドキュメント整備（CLAUDE.md）
-- [ ] パフォーマンス最適化
+- [x] パフォーマンス最適化
 
 ## 🎯 現在の状況
 
@@ -151,3 +151,10 @@
 - [x] `pnpm run check` - 修正後必須チェック
 - [x] `pnpm run lint:fix` - 自動修正機能
 - [x] `pnpm run typecheck` - 高速型チェック
+
+### 🔧 バグ修正 (緊急)
+- [x] React Ink Raw mode エラー修正
+  - [x] `useStdin` フックで `isRawModeSupported` チェック実装
+  - [x] 条件付きレンダリングでinteractive UIを制御
+  - [x] `stdin` TTY検出による条件付きレンダリング
+- [ ] React key重複警告の修正

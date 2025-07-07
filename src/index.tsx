@@ -66,4 +66,9 @@ if (showVersion) {
 }
 
 // Render the CLI app
-render(<Cli model={model} vaultPath={vaultPath} />);
+const renderOptions = {
+	exitOnCtrlC: false,
+	...(process.stdin.isTTY === true ? { stdin: process.stdin } : {}),
+};
+
+render(<Cli model={model} vaultPath={vaultPath} />, renderOptions);

@@ -39,12 +39,14 @@ export async function saveOutput(
 	metadata: OutputMetadata,
 ): Promise<string> {
 	const outputsDir = join(promptPath, 'outputs');
-	const timestamp = generateTimestamp();
-	const fileName = generateFileName(timestamp);
+
+	// Use provided timestamp or generate new one
+	const finalTimestamp = metadata.timestamp || generateTimestamp();
+	const fileName = generateFileName(finalTimestamp);
 	const filePath = join(outputsDir, fileName);
 
-	// Update metadata with generated timestamp
-	const updatedMetadata = { ...metadata, timestamp };
+	// Update metadata with final timestamp
+	const updatedMetadata = { ...metadata, timestamp: finalTimestamp };
 
 	const frontmatter = generateFrontmatter(updatedMetadata);
 	const fileContent = `${frontmatter}\n${content}\n`;
@@ -68,6 +70,7 @@ export function validateModel(model: string): boolean {
 }
 
 export function normalizeModelName(model: string): string {
+	const normalizedModel = model.toLowerCase();
 	const modelMap: Record<string, string> = {
 		sonnet4: 'claude-sonnet-4',
 		opus4: 'claude-opus-4',
@@ -75,5 +78,5 @@ export function normalizeModelName(model: string): string {
 		'claude-opus-4': 'claude-opus-4',
 	};
 
-	return modelMap[model] || 'claude-sonnet-4';
+	return modelMap[normalizedModel] || 'claude-sonnet-4';
 }

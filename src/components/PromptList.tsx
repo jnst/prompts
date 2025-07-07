@@ -1,4 +1,4 @@
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useStdin } from 'ink';
 import { useEffect, useState } from 'react';
 import type { PromptInfo } from '../utils/promptManager.js';
 
@@ -10,20 +10,26 @@ interface PromptListProps {
 
 export function PromptList({ prompts, onSelect, onExit }: PromptListProps) {
 	const [selectedIndex, setSelectedIndex] = useState(0);
+	const { isRawModeSupported } = useStdin();
 
-	useInput((input, key) => {
-		if (key.upArrow) {
-			setSelectedIndex((prev) => Math.max(0, prev - 1));
-		} else if (key.downArrow) {
-			setSelectedIndex((prev) => Math.min(prompts.length - 1, prev + 1));
-		} else if (key.return) {
-			if (prompts[selectedIndex]) {
-				onSelect(prompts[selectedIndex]);
+	useInput(
+		(input, key) => {
+			if (key.upArrow) {
+				setSelectedIndex((prev) => Math.max(0, prev - 1));
+			} else if (key.downArrow) {
+				setSelectedIndex((prev) => Math.min(prompts.length - 1, prev + 1));
+			} else if (key.return) {
+				if (prompts[selectedIndex]) {
+					onSelect(prompts[selectedIndex]);
+				}
+			} else if (key.escape || input === 'q') {
+				onExit();
 			}
-		} else if (key.escape || input === 'q') {
-			onExit();
-		}
-	});
+		},
+		{
+			isActive: isRawModeSupported,
+		},
+	);
 
 	useEffect(() => {
 		// Reset selection if prompts change
@@ -39,6 +45,35 @@ export function PromptList({ prompts, onSelect, onExit }: PromptListProps) {
 					with prompt.toml files
 				</Text>
 				<Text dimColor>Press ESC or 'q' to exit</Text>
+			</Box>
+		);
+	}
+
+	if (!isRawModeSupported) {
+		return (
+			<Box flexDirection="column">
+				<Text color="yellow">
+					Interactive mode not supported in this environment
+				</Text>
+				<Text>Available prompts:</Text>
+				<Box marginTop={1} flexDirection="column">
+					{prompts.map((prompt, index) => (
+						<Box key={prompt.name} paddingLeft={2}>
+							<Text>
+								{index + 1}. {prompt.name}
+								{!prompt.hasToml && (
+									<Text color="yellow"> (no prompt.toml)</Text>
+								)}
+							</Text>
+						</Box>
+					))}
+				</Box>
+				<Box marginTop={1}>
+					<Text dimColor>
+						Run in a terminal that supports interactive input to use selection
+						UI
+					</Text>
+				</Box>
 			</Box>
 		);
 	}
