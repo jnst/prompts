@@ -1,0 +1,42 @@
+{
+  "name": "prompts",
+  "version": "1.0.0",
+  "description": "LLM Prompt Management CLI with React Ink",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "prompts-cli": "./bin/prompts-cli"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.tsx",
+    "lint": "biome check . && oxlint .",
+    "format": "biome format . --write",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "keywords": [
+    "cli",
+    "prompt",
+    "llm",
+    "management",
+    "toml"
+  ],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.11.1",
+  "dependencies": {
+    "ink": "^6.0.1",
+    "react": "^19.1.0",
+    "smol-toml": "^1.4.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.6",
+    "@types/node": "^24.0.10",
+    "@types/react": "^19.1.8",
+    "oxlint": "^1.6.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
