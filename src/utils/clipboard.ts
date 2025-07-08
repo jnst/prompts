@@ -1,43 +1,84 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { err, ok, type Result } from 'neverthrow';
+import {
+	ClipboardBinaryError,
+	ClipboardCommandError,
+	ClipboardEmptyError,
+	ClipboardShortWarning,
+	ClipboardTooLargeError,
+	type PromptsWarning,
+} from '../errors/index.js';
 
 const execAsync = promisify(exec);
 
-export async function getClipboardContent(): Promise<string> {
+export async function getClipboardContent(): Promise<
+	Result<
+		{ content: string; warnings: PromptsWarning[] },
+		| ClipboardEmptyError
+		| ClipboardTooLargeError
+		| ClipboardBinaryError
+		| ClipboardCommandError
+	>
+> {
 	try {
 		const { stdout } = await execAsync('pbpaste');
 		const content = stdout.trim();
 
 		if (!content) {
-			throw new Error('Clipboard is empty');
+			return err(new ClipboardEmptyError());
 		}
 
-		return content;
+		// Validate content length (reasonable limits)
+		if (content.length > 1000000) {
+			// 1MB limit
+			return err(new ClipboardTooLargeError());
+		}
+
+		const warnings: PromptsWarning[] = [];
+		if (content.length < 3) {
+			warnings.push(new ClipboardShortWarning());
+		}
+
+		// Check for potentially problematic content - use string methods instead of regex
+		const hasControlChars = content.split('').some((char) => {
+			const code = char.charCodeAt(0);
+			return (
+				(code >= 0x00 && code <= 0x08) ||
+				(code >= 0x0e && code <= 0x1f) ||
+				code === 0x7f
+			);
+		});
+
+		if (hasControlChars) {
+			return err(new ClipboardBinaryError());
+		}
+
+		return ok({ content, warnings });
 	} catch (error) {
 		if (error instanceof Error) {
 			if (error.message.includes('command not found')) {
-				throw new Error(
-					'pbpaste command not found. This tool only works on macOS.',
-				);
+				return err(new ClipboardCommandError('pbpaste'));
 			}
-			throw error;
+			return err(new ClipboardCommandError('pbpaste'));
 		}
-		throw new Error('Failed to read clipboard content');
+		return err(new ClipboardCommandError('pbpaste'));
 	}
 }
 
-export async function setClipboardContent(content: string): Promise<void> {
+export async function setClipboardContent(
+	content: string,
+): Promise<Result<void, ClipboardCommandError>> {
 	try {
 		await execAsync(`echo ${JSON.stringify(content)} | pbcopy`);
+		return ok(undefined);
 	} catch (error) {
 		if (error instanceof Error) {
 			if (error.message.includes('command not found')) {
-				throw new Error(
-					'pbcopy command not found. This tool only works on macOS.',
-				);
+				return err(new ClipboardCommandError('pbcopy'));
 			}
-			throw error;
+			return err(new ClipboardCommandError('pbcopy'));
 		}
-		throw new Error('Failed to set clipboard content');
+		return err(new ClipboardCommandError('pbcopy'));
 	}
 }

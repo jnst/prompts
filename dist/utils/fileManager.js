@@ -1,5 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { err, ok } from 'neverthrow';
+import { ModelEmptyError, ModelRequiredError, ModelValidationError, OutputWriteError, ValidationError, } from '../errors/index.js';
 export function generateFrontmatter(metadata) {
     return `---
 version: "${metadata.version}"
@@ -23,12 +25,32 @@ export function generateFileName(timestamp) {
     return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}.md`;
 }
 export async function saveOutput(promptPath, content, metadata) {
+    // Validate inputs
+    if (!promptPath || typeof promptPath !== 'string') {
+        return err(new ValidationError('Prompt path', 'a string'));
+    }
+    if (!content || typeof content !== 'string') {
+        return err(new ValidationError('Content', 'a string'));
+    }
+    if (!metadata || typeof metadata !== 'object') {
+        return err(new ValidationError('Metadata', 'an object'));
+    }
+    // Validate model name
+    const modelValidation = validateModel(metadata.model);
+    if (modelValidation.isErr()) {
+        return err(modelValidation.error);
+    }
+    // Validate version format
+    if (!metadata.version || typeof metadata.version !== 'string') {
+        return err(new ValidationError('Version', 'a string'));
+    }
     const outputsDir = join(promptPath, 'outputs');
-    const timestamp = generateTimestamp();
-    const fileName = generateFileName(timestamp);
+    // Use provided timestamp or generate new one
+    const finalTimestamp = metadata.timestamp || generateTimestamp();
+    const fileName = generateFileName(finalTimestamp);
     const filePath = join(outputsDir, fileName);
-    // Update metadata with generated timestamp
-    const updatedMetadata = { ...metadata, timestamp };
+    // Update metadata with final timestamp
+    const updatedMetadata = { ...metadata, timestamp: finalTimestamp };
     const frontmatter = generateFrontmatter(updatedMetadata);
     const fileContent = `${frontmatter}\n${content}\n`;
     try {
@@ -36,22 +58,39 @@ export async function saveOutput(promptPath, content, metadata) {
         await mkdir(outputsDir, { recursive: true });
         // Write the file
         await writeFile(filePath, fileContent, 'utf-8');
-        return filePath;
+        return ok(filePath);
     }
     catch (error) {
-        throw new Error(`Failed to save output file: ${error}`);
+        if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
+            return err(new OutputWriteError(outputsDir, 'Permission denied. Please check file permissions'));
+        }
+        if (error instanceof Error && 'code' in error && error.code === 'ENOSPC') {
+            return err(new OutputWriteError(outputsDir, 'No space left on device. Please free up disk space'));
+        }
+        return err(new OutputWriteError(outputsDir, `Failed to save output file: ${error}`));
     }
 }
 export function validateModel(model) {
+    if (!model || typeof model !== 'string') {
+        return err(new ModelRequiredError());
+    }
+    const trimmedModel = model.trim();
+    if (trimmedModel.length === 0) {
+        return err(new ModelEmptyError());
+    }
     const validModels = ['claude-sonnet-4', 'claude-opus-4'];
-    return validModels.includes(model);
+    if (!validModels.includes(trimmedModel)) {
+        return err(new ModelValidationError(trimmedModel, validModels));
+    }
+    return ok(undefined);
 }
 export function normalizeModelName(model) {
+    const normalizedModel = model.toLowerCase();
     const modelMap = {
         sonnet4: 'claude-sonnet-4',
         opus4: 'claude-opus-4',
         'claude-sonnet-4': 'claude-sonnet-4',
         'claude-opus-4': 'claude-opus-4',
     };
-    return modelMap[model] || 'claude-sonnet-4';
+    return modelMap[normalizedModel] || model;
 }

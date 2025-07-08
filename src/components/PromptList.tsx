@@ -58,7 +58,7 @@ export function PromptList({ prompts, onSelect, onExit }: PromptListProps) {
 				<Text>Available prompts:</Text>
 				<Box marginTop={1} flexDirection="column">
 					{prompts.map((prompt, index) => (
-						<Box key={prompt.name} paddingLeft={2}>
+						<Box key={`non-interactive-${prompt.path}`} paddingLeft={2}>
 							<Text>
 								{index + 1}. {prompt.name}
 								{!prompt.hasToml && (
@@ -86,7 +86,7 @@ export function PromptList({ prompts, onSelect, onExit }: PromptListProps) {
 			</Text>
 			<Box marginTop={1} flexDirection="column">
 				{prompts.map((prompt, index) => (
-					<Box key={prompt.name} paddingLeft={2}>
+					<Box key={`interactive-${prompt.path}`} paddingLeft={2}>
 						<Text color={index === selectedIndex ? 'cyan' : 'white'}>
 							{index === selectedIndex ? '▶ ' : '  '}
 							{prompt.name}

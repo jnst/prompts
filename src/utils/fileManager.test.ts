@@ -38,9 +38,9 @@ describe('fileManager', () => {
 			expect(normalizeModelName('OPUS4')).toBe('claude-opus-4');
 		});
 
-		it('should default to claude-sonnet-4 for unknown models', () => {
-			expect(normalizeModelName('unknown-model')).toBe('claude-sonnet-4');
-			expect(normalizeModelName('')).toBe('claude-sonnet-4');
+		it('should return original input for unknown models', () => {
+			expect(normalizeModelName('unknown-model')).toBe('unknown-model');
+			expect(normalizeModelName('')).toBe('');
 		});
 	});
 
@@ -53,14 +53,13 @@ describe('fileManager', () => {
 				timestamp: '2024-01-15T10:30:00Z',
 			};
 
-			const outputPath = await saveOutput(
-				TEST_PROMPT_PATH,
-				testContent,
-				metadata,
-			);
+			const result = await saveOutput(TEST_PROMPT_PATH, testContent, metadata);
 
-			// Check that file was created
-			expect(outputPath).toBeDefined();
+			// Check that save was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard for TypeScript
+
+			const outputPath = result.value;
 			await expect(fs.access(outputPath)).resolves.not.toThrow();
 
 			// Read and verify content
@@ -82,11 +81,13 @@ describe('fileManager', () => {
 				timestamp: '', // Empty timestamp should trigger generation
 			};
 
-			const outputPath = await saveOutput(
-				TEST_PROMPT_PATH,
-				testContent,
-				metadata,
-			);
+			const result = await saveOutput(TEST_PROMPT_PATH, testContent, metadata);
+
+			// Check that save was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard for TypeScript
+
+			const outputPath = result.value;
 			const savedContent = await fs.readFile(outputPath, 'utf-8');
 
 			// Should contain a valid ISO timestamp
@@ -109,11 +110,13 @@ describe('fileManager', () => {
 				timestamp: '2024-01-15T10:30:00Z',
 			};
 
-			const outputPath = await saveOutput(
-				TEST_PROMPT_PATH,
-				testContent,
-				metadata,
-			);
+			const result = await saveOutput(TEST_PROMPT_PATH, testContent, metadata);
+
+			// Check that save was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard for TypeScript
+
+			const outputPath = result.value;
 
 			// Check that outputs directory was created
 			await expect(fs.access(TEST_OUTPUTS_PATH)).resolves.not.toThrow();
@@ -134,14 +137,22 @@ describe('fileManager', () => {
 			};
 
 			// Use different timestamps to ensure unique filenames
-			const path1 = await saveOutput(TEST_PROMPT_PATH, testContent, {
+			const result1 = await saveOutput(TEST_PROMPT_PATH, testContent, {
 				...metadata1,
 				timestamp: '2024-01-15T10:30:00.000Z',
 			});
-			const path2 = await saveOutput(TEST_PROMPT_PATH, testContent, {
+			const result2 = await saveOutput(TEST_PROMPT_PATH, testContent, {
 				...metadata2,
 				timestamp: '2024-01-15T10:30:01.000Z',
 			});
+
+			// Check that both saves were successful
+			expect(result1.isOk()).toBe(true);
+			expect(result2.isOk()).toBe(true);
+			if (result1.isErr() || result2.isErr()) return; // Type guard for TypeScript
+
+			const path1 = result1.value;
+			const path2 = result2.value;
 
 			expect(path1).not.toBe(path2);
 			await expect(fs.access(path1)).resolves.not.toThrow();
@@ -157,11 +168,13 @@ describe('fileManager', () => {
 				timestamp: '2024-01-15T10:30:00Z',
 			};
 
-			const outputPath = await saveOutput(
-				TEST_PROMPT_PATH,
-				testContent,
-				metadata,
-			);
+			const result = await saveOutput(TEST_PROMPT_PATH, testContent, metadata);
+
+			// Check that save was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard for TypeScript
+
+			const outputPath = result.value;
 			const savedContent = await fs.readFile(outputPath, 'utf-8');
 
 			expect(savedContent).toContain('version: "1.0.0-日本語"');
@@ -181,11 +194,13 @@ Line 4 after empty line
 				timestamp: '2024-01-15T10:30:00Z',
 			};
 
-			const outputPath = await saveOutput(
-				TEST_PROMPT_PATH,
-				testContent,
-				metadata,
-			);
+			const result = await saveOutput(TEST_PROMPT_PATH, testContent, metadata);
+
+			// Check that save was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard for TypeScript
+
+			const outputPath = result.value;
 			const savedContent = await fs.readFile(outputPath, 'utf-8');
 
 			expect(savedContent).toContain('Line 1');
@@ -199,11 +214,13 @@ Line 4 after empty line
 				timestamp: '2024-01-15T10:30:00Z',
 			};
 
-			const outputPath = await saveOutput(
-				TEST_PROMPT_PATH,
-				testContent,
-				metadata,
-			);
+			const result = await saveOutput(TEST_PROMPT_PATH, testContent, metadata);
+
+			// Check that save was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard for TypeScript
+
+			const outputPath = result.value;
 
 			expect(path.extname(outputPath)).toBe('.md');
 		});

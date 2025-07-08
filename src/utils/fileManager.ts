@@ -1,5 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { err, ok, type Result } from 'neverthrow';
+import {
+	ModelEmptyError,
+	ModelRequiredError,
+	ModelValidationError,
+	OutputWriteError,
+	ValidationError,
+} from '../errors/index.js';
 
 export interface OutputMetadata {
 	version: string;
@@ -37,7 +45,40 @@ export async function saveOutput(
 	promptPath: string,
 	content: string,
 	metadata: OutputMetadata,
-): Promise<string> {
+): Promise<
+	Result<
+		string,
+		| ValidationError
+		| ModelRequiredError
+		| ModelEmptyError
+		| ModelValidationError
+		| OutputWriteError
+	>
+> {
+	// Validate inputs
+	if (!promptPath || typeof promptPath !== 'string') {
+		return err(new ValidationError('Prompt path', 'a string'));
+	}
+
+	if (!content || typeof content !== 'string') {
+		return err(new ValidationError('Content', 'a string'));
+	}
+
+	if (!metadata || typeof metadata !== 'object') {
+		return err(new ValidationError('Metadata', 'an object'));
+	}
+
+	// Validate model name
+	const modelValidation = validateModel(metadata.model);
+	if (modelValidation.isErr()) {
+		return err(modelValidation.error);
+	}
+
+	// Validate version format
+	if (!metadata.version || typeof metadata.version !== 'string') {
+		return err(new ValidationError('Version', 'a string'));
+	}
+
 	const outputsDir = join(promptPath, 'outputs');
 
 	// Use provided timestamp or generate new one
@@ -58,15 +99,48 @@ export async function saveOutput(
 		// Write the file
 		await writeFile(filePath, fileContent, 'utf-8');
 
-		return filePath;
+		return ok(filePath);
 	} catch (error) {
-		throw new Error(`Failed to save output file: ${error}`);
+		if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
+			return err(
+				new OutputWriteError(
+					outputsDir,
+					'Permission denied. Please check file permissions',
+				),
+			);
+		}
+		if (error instanceof Error && 'code' in error && error.code === 'ENOSPC') {
+			return err(
+				new OutputWriteError(
+					outputsDir,
+					'No space left on device. Please free up disk space',
+				),
+			);
+		}
+		return err(
+			new OutputWriteError(outputsDir, `Failed to save output file: ${error}`),
+		);
 	}
 }
 
-export function validateModel(model: string): boolean {
+export function validateModel(
+	model: string,
+): Result<void, ModelRequiredError | ModelEmptyError | ModelValidationError> {
+	if (!model || typeof model !== 'string') {
+		return err(new ModelRequiredError());
+	}
+
+	const trimmedModel = model.trim();
+	if (trimmedModel.length === 0) {
+		return err(new ModelEmptyError());
+	}
+
 	const validModels = ['claude-sonnet-4', 'claude-opus-4'];
-	return validModels.includes(model);
+	if (!validModels.includes(trimmedModel)) {
+		return err(new ModelValidationError(trimmedModel, validModels));
+	}
+
+	return ok(undefined);
 }
 
 export function normalizeModelName(model: string): string {
@@ -78,5 +152,5 @@ export function normalizeModelName(model: string): string {
 		'claude-opus-4': 'claude-opus-4',
 	};
 
-	return modelMap[normalizedModel] || 'claude-sonnet-4';
+	return modelMap[normalizedModel] || model;
 }

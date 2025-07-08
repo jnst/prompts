@@ -1,5 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { err, ok } from 'neverthrow';
+import { VaultAccessError, VaultEmptyWarning, VaultNotDirectoryError, VaultNotFoundError, } from '../errors/index.js';
 export async function scanVaultDirectory(vaultPath = 'vault') {
     try {
         const entries = await readdir(vaultPath, { withFileTypes: true });
@@ -23,26 +25,41 @@ export async function scanVaultDirectory(vaultPath = 'vault') {
                 });
             }
         }
-        return prompts.sort((a, b) => a.name.localeCompare(b.name));
+        return ok(prompts.sort((a, b) => a.name.localeCompare(b.name)));
     }
     catch (error) {
         if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-            throw new Error(`Vault directory not found: ${vaultPath}`);
+            return err(new VaultNotFoundError(vaultPath));
         }
-        throw error;
+        return err(new VaultNotFoundError(vaultPath));
     }
 }
 export async function validateVaultStructure(vaultPath = 'vault') {
     try {
         const stats = await stat(vaultPath);
         if (!stats.isDirectory()) {
-            throw new Error(`${vaultPath} is not a directory`);
+            return err(new VaultNotDirectoryError(vaultPath));
         }
+        // Check if vault directory is readable
+        try {
+            await readdir(vaultPath);
+        }
+        catch {
+            return err(new VaultAccessError(vaultPath));
+        }
+        // Check if vault has any subdirectories
+        const entries = await readdir(vaultPath, { withFileTypes: true });
+        const hasDirectories = entries.some((entry) => entry.isDirectory());
+        const warnings = [];
+        if (!hasDirectories) {
+            warnings.push(new VaultEmptyWarning(vaultPath));
+        }
+        return ok(warnings);
     }
     catch (error) {
         if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-            throw new Error(`Vault directory not found: ${vaultPath}`);
+            return err(new VaultNotFoundError(vaultPath));
         }
-        throw error;
+        return err(new VaultNotFoundError(vaultPath));
     }
 }

@@ -1,6 +1,6 @@
 ---
 model: "claude-opus-4"
-timestamp: "2025-07-07T17:12:41"
+timestamp: "2025-07-07T17:12:41Z"
 ---
 
 PySpark は **分散データ処理のための Python API** で、Apache Spark の機能を Python から使えるようにしたものです。

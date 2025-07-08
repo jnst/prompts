@@ -26,32 +26,38 @@ describe('promptManager', () => {
 
 	describe('validateVaultStructure', () => {
 		it('should pass when vault directory exists', async () => {
-			await expect(
-				validateVaultStructure(TEST_VAULT_PATH),
-			).resolves.not.toThrow();
+			const result = await validateVaultStructure(TEST_VAULT_PATH);
+			expect(result.isOk()).toBe(true);
 		});
 
-		it('should throw when vault directory does not exist', async () => {
+		it('should return error when vault directory does not exist', async () => {
 			const nonExistentPath = path.join(process.cwd(), 'non-existent-vault');
-			await expect(validateVaultStructure(nonExistentPath)).rejects.toThrow(
-				'Vault directory not found:',
-			);
+			const result = await validateVaultStructure(nonExistentPath);
+			expect(result.isErr()).toBe(true);
+			if (result.isErr()) {
+				expect(result.error.message).toContain('Vault directory not found:');
+			}
 		});
 
-		it('should throw when path is not a directory', async () => {
+		it('should return error when path is not a directory', async () => {
 			const filePath = path.join(TEST_VAULT_PATH, 'not-a-directory.txt');
 			await fs.writeFile(filePath, 'test content');
 
-			await expect(validateVaultStructure(filePath)).rejects.toThrow(
-				'is not a directory',
-			);
+			const result = await validateVaultStructure(filePath);
+			expect(result.isErr()).toBe(true);
+			if (result.isErr()) {
+				expect(result.error.message).toContain('is not a directory');
+			}
 		});
 	});
 
 	describe('scanVaultDirectory', () => {
 		it('should return empty array when vault is empty', async () => {
 			const result = await scanVaultDirectory(TEST_VAULT_PATH);
-			expect(result).toEqual([]);
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value).toEqual([]);
+			}
 		});
 
 		it('should find prompts with prompt.toml files', async () => {
@@ -73,12 +79,15 @@ changes = ["Initial version"]
 
 			const result = await scanVaultDirectory(TEST_VAULT_PATH);
 
-			expect(result).toHaveLength(1);
-			expect(result[0]).toEqual({
-				name: 'test-prompt',
-				path: promptDir,
-				hasToml: true,
-			} satisfies PromptInfo);
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value).toHaveLength(1);
+				expect(result.value[0]).toEqual({
+					name: 'test-prompt',
+					path: promptDir,
+					hasToml: true,
+				} satisfies PromptInfo);
+			}
 		});
 
 		it('should find prompts without prompt.toml files', async () => {
@@ -89,12 +98,15 @@ changes = ["Initial version"]
 
 			const result = await scanVaultDirectory(TEST_VAULT_PATH);
 
-			expect(result).toHaveLength(1);
-			expect(result[0]).toEqual({
-				name: 'no-toml-prompt',
-				path: promptDir,
-				hasToml: false,
-			} satisfies PromptInfo);
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value).toHaveLength(1);
+				expect(result.value[0]).toEqual({
+					name: 'no-toml-prompt',
+					path: promptDir,
+					hasToml: false,
+				} satisfies PromptInfo);
+			}
 		});
 
 		it('should handle Japanese directory names', async () => {
@@ -108,9 +120,12 @@ changes = ["Initial version"]
 
 			const result = await scanVaultDirectory(TEST_VAULT_PATH);
 
-			expect(result).toHaveLength(1);
-			expect(result[0].name).toBe('概念理解テスト');
-			expect(result[0].hasToml).toBe(true);
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value).toHaveLength(1);
+				expect(result.value[0].name).toBe('概念理解テスト');
+				expect(result.value[0].hasToml).toBe(true);
+			}
 		});
 
 		it('should ignore files in vault root', async () => {
@@ -126,8 +141,11 @@ changes = ["Initial version"]
 
 			const result = await scanVaultDirectory(TEST_VAULT_PATH);
 
-			expect(result).toHaveLength(1);
-			expect(result[0].name).toBe('valid-prompt');
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value).toHaveLength(1);
+				expect(result.value[0].name).toBe('valid-prompt');
+			}
 		});
 
 		it('should sort results by name', async () => {
@@ -141,11 +159,14 @@ changes = ["Initial version"]
 
 			const result = await scanVaultDirectory(TEST_VAULT_PATH);
 
-			expect(result.map((p) => p.name)).toEqual([
-				'alpha-prompt',
-				'beta-prompt',
-				'zebra-prompt',
-			]);
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value.map((p) => p.name)).toEqual([
+					'alpha-prompt',
+					'beta-prompt',
+					'zebra-prompt',
+				]);
+			}
 		});
 	});
 });

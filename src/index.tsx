@@ -2,6 +2,7 @@
 
 import { render } from 'ink';
 import { Cli } from './cli.js';
+import { normalizeModelName, validateModel } from './utils/fileManager.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -64,6 +65,15 @@ if (showVersion) {
 	}
 	process.exit(0);
 }
+
+// Validate and normalize model name
+const normalizedModel = normalizeModelName(model);
+const modelValidation = validateModel(normalizedModel);
+if (modelValidation.isErr()) {
+	console.error(modelValidation.error.message);
+	process.exit(1);
+}
+model = normalizedModel;
 
 // Render the CLI app
 const renderOptions = {

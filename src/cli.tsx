@@ -31,18 +31,30 @@ export function Cli({
 	const normalizedModel = normalizeModelName(model);
 
 	const loadPrompts = useCallback(async () => {
-		try {
-			setState('loading');
-			await validateVaultStructure(vaultPath);
-			const promptList = await scanVaultDirectory(vaultPath);
-			setPrompts(promptList);
-			setState('selecting');
-		} catch (error) {
-			setErrorMessage(
-				error instanceof Error ? error.message : 'Unknown error occurred',
-			);
+		setState('loading');
+
+		const vaultValidation = await validateVaultStructure(vaultPath);
+		if (vaultValidation.isErr()) {
+			setErrorMessage(vaultValidation.error.message);
 			setState('error');
+			return;
 		}
+
+		// Handle warnings
+		const warnings = vaultValidation.value;
+		warnings.forEach((warning) => {
+			console.warn(warning.message);
+		});
+
+		const promptScan = await scanVaultDirectory(vaultPath);
+		if (promptScan.isErr()) {
+			setErrorMessage(promptScan.error.message);
+			setState('error');
+			return;
+		}
+
+		setPrompts(promptScan.value);
+		setState('selecting');
 	}, [vaultPath]);
 
 	useEffect(() => {
@@ -58,36 +70,51 @@ export function Cli({
 			return;
 		}
 
-		try {
-			setState('processing');
-			setSelectedPrompt(prompt);
+		setState('processing');
+		setSelectedPrompt(prompt);
 
-			// Parse the prompt template
-			const promptTemplate = await parsePromptToml(prompt.path);
-
-			// Get clipboard content
-			const clipboardContent = await getClipboardContent();
-
-			// Save the output
-			const outputPath = await saveOutput(prompt.path, clipboardContent, {
-				version: promptTemplate.version,
-				model: normalizedModel,
-				timestamp: '', // Will be generated in saveOutput
-			});
-
-			setSuccessMessage(`Output saved to: ${outputPath}`);
-			setState('success');
-
-			// Auto-exit after 2 seconds
-			setTimeout(() => {
-				exit();
-			}, 2000);
-		} catch (error) {
-			setErrorMessage(
-				error instanceof Error ? error.message : 'Unknown error occurred',
-			);
+		// Parse the prompt template
+		const promptResult = await parsePromptToml(prompt.path);
+		if (promptResult.isErr()) {
+			setErrorMessage(promptResult.error.message);
 			setState('error');
+			return;
 		}
+
+		// Get clipboard content
+		const clipboardResult = await getClipboardContent();
+		if (clipboardResult.isErr()) {
+			setErrorMessage(clipboardResult.error.message);
+			setState('error');
+			return;
+		}
+
+		// Handle warnings
+		const { content, warnings } = clipboardResult.value;
+		warnings.forEach((warning) => {
+			console.warn(warning.message);
+		});
+
+		// Save the output
+		const outputResult = await saveOutput(prompt.path, content, {
+			version: promptResult.value.version,
+			model: normalizedModel,
+			timestamp: '', // Will be generated in saveOutput
+		});
+
+		if (outputResult.isErr()) {
+			setErrorMessage(outputResult.error.message);
+			setState('error');
+			return;
+		}
+
+		setSuccessMessage(`Output saved to: ${outputResult.value}`);
+		setState('success');
+
+		// Auto-exit after 2 seconds
+		setTimeout(() => {
+			exit();
+		}, 2000);
 	};
 
 	const handleExit = () => {

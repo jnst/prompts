@@ -24,6 +24,10 @@ pnpm run typecheck  # Fast type checking (no compilation)
 pnpm run format     # Code formatting with Biome
 pnpm run test       # Run Vitest tests
 pnpm run test:watch # Watch mode for tests
+
+# Run specific tests:
+pnpm run test src/utils/fileManager.test.ts     # Single test file
+pnpm run test src/utils/                        # All tests in directory
 ```
 
 **Quality Assurance:**
@@ -41,19 +45,22 @@ pnpm run test:watch # Watch mode for tests
 - **Quality Tools**: Biome (formatting/linting) + Oxlint
 - **Testing**: Vitest
 - **TOML Parsing**: smol-toml library
+- **Error Handling**: neverthrow Result types for functional error handling
 
 ### Directory Structure
 ```
 vault/                    # User's prompt management directory
 ├── {prompt-name}/       # Individual prompt directories (supports Japanese)
-│   ├── prompt.toml      # Template + version + changelog
+│   ├── prompt.toml      # Metadata + prompts array with version history
 │   └── outputs/         # Generated output files
 src/
+├── errors/              # Custom error types and neverthrow integration
 ├── utils/               # Core business logic utilities
 ├── components/          # React Ink UI components
 ├── cli.tsx              # Main CLI application component
 └── index.tsx            # Entry point with arg parsing
-bin/prompts-cli          # Executable shim
+bin/prompt               # Executable shim
+ERROR_SPECIFICATION.md   # Comprehensive error handling documentation
 ```
 
 ### Data Flow Architecture
@@ -68,23 +75,58 @@ bin/prompts-cli          # Executable shim
 - Manages vault scanning, prompt selection, and output generation flow
 - Handles errors with user-friendly messages
 
-**3. Core Utilities Pattern:**
-- `promptManager`: Vault directory scanning and validation
-- `tomlParser`: Parse prompt.toml with version extraction (latest = changelog[0])
-- `clipboard`: macOS pbpaste/pbcopy integration
-- `fileManager`: Output file generation with frontmatter
+**3. Core Utilities Pattern (Result-based Error Handling):**
+- `promptManager`: Vault directory scanning and validation → Result<PromptInfo[], VaultError>
+- `tomlParser`: Parse prompt.toml with metadata/prompts structure → Result<PromptTemplate, TomlError>
+- `clipboard`: macOS pbpaste/pbcopy integration → Result<{content, warnings}, ClipboardError>
+- `fileManager`: Output file generation with frontmatter → Result<string, OutputError>
 
 **4. UI Components (React Ink):**
 - `PromptList`: Interactive selection with arrow keys and enter
 - State-driven UI that responds to application state changes
 - Graceful error handling and user feedback
+- Raw mode detection with fallback UI for non-interactive environments
+- React keys use stable `prompt.path` identifiers (not array indices)
+
+### Error Handling Architecture
+
+**neverthrow Result Types:**
+- All async operations return `Result<T, E>` instead of throwing exceptions
+- Error types defined in `src/errors/index.ts` with specific categories:
+  - **Filesystem**: VaultNotFoundError, VaultAccessError, OutputWriteError
+  - **Configuration**: TomlSyntaxError, TomlStructureError, TomlVersionFormatError
+  - **Input**: ClipboardEmptyError, ClipboardBinaryError, ClipboardTooLargeError
+  - **Validation**: ModelValidationError, ValidationError
+- Warnings (non-fatal) handled separately from errors using PromptsWarning class
+- CLI layer (cli.tsx) processes Results with `.isErr()` and `.value` pattern
+
+**Error Message Design:**
+- Two-line format: `[Problem description]\n[Solution/example]`
+- Context-aware with file paths and specific guidance
+- Detailed specification in `ERROR_SPECIFICATION.md`
 
 ### Critical Implementation Details
 
 **TOML Version System:**
-- Latest version is always changelog array index 0
-- Each prompt.toml contains template + version + changelog array
+- New structure with [metadata] section and [[prompts]] array
+- current_version in metadata points to the active version
+- Each prompt.toml contains metadata + prompts array with version history
 - Output files use frontmatter with exact order: version, model, timestamp
+
+**TOML Structure Format:**
+```toml
+[metadata]
+current_version = "1.0.0"
+created_at = "2025-07-07T00:00:00Z"
+updated_at = "2025-07-07T00:00:00Z"
+
+[[prompts]]
+version = "1.0.0"
+content = """
+Your prompt template here with {{placeholders}}
+"""
+created_at = "2025-07-07T00:00:00Z"
+```
 
 **Output File Format:**
 ```markdown
@@ -100,6 +142,8 @@ timestamp: "2025-07-07T17:12:41Z"
 - Default: "claude-sonnet-4"
 - Supports: "claude-opus-4"
 - CLI accepts: --model opus4 or -m opus4 (normalized internally)
+- Model validation occurs at CLI entry point and fails fast for invalid models
+- `normalizeModelName()` returns original input for unknown models (no silent defaults)
 
 **Clipboard Integration:**
 - Uses macOS pbpaste for input (macOS-specific dependency)
@@ -109,11 +153,37 @@ timestamp: "2025-07-07T17:12:41Z"
 - Uses Node.js standard APIs (node:fs/promises, node:path)
 - Strict TypeScript configuration with noPropertyAccessFromIndexSignature
 - Index signature access requires bracket notation for TOML parsing
+- neverthrow Result types provide compile-time error handling safety
+- All utility functions use functional error handling patterns
 
 **Build Configuration:**
 - ESM modules (type: "module" in package.json)
 - Biome excludes .claude/ directory to avoid linting development tools
-- Executable bin/prompts-cli references compiled dist/index.js
+- Executable bin/prompt references compiled dist/index.js
+
+## Development Patterns
+
+**Error Handling Requirements:**
+- ALWAYS use neverthrow Result types for functions that can fail
+- Define custom error classes extending PromptsError in `src/errors/index.ts`
+- Process Results in CLI layer with proper `.isErr()` checks
+- Use PromptsWarning for non-fatal issues that don't stop execution
+- Follow ERROR_SPEC.md for consistent error message format
+
+**Code Quality Standards:**
+- Run `pnpm run check` after ANY code changes before committing
+- All async utilities must return Result<T, E> instead of throwing
+- Import neverthrow types as: `import { type Result, ok, err } from 'neverthrow'`
+- Use biome/oxlint auto-fixes via `pnpm run lint:fix`
+
+**Testing Patterns:**
+- All tests must handle neverthrow Result types properly:
+  - Use `result.isOk()` and `result.isErr()` for validation
+  - Access values with `result.value` after confirming `result.isOk()`
+  - Access errors with `result.error` after confirming `result.isErr()`
+  - Add TypeScript type guards: `if (result.isErr()) return;`
+- Test file naming: `*.test.ts` in same directory as source
+- 31 comprehensive tests cover all utilities (clipboard, tomlParser, fileManager, promptManager)
 
 ## Project Management
 - Implement tasks according to @TODO.md. Update the Tasklist in TODO.md as work progresses.

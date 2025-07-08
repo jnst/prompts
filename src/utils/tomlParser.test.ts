@@ -19,155 +19,239 @@ describe('tomlParser', () => {
 	});
 
 	describe('parsePromptToml', () => {
-		it('should parse valid TOML with single changelog entry', async () => {
+		it('should parse valid TOML with new structure', async () => {
 			const tomlContent = `
-[prompt]
-version = "1.2.0"
-template = "Test template content"
+[metadata]
+current_version = "1.2.0"
+created_at = "2024-01-01"
+updated_at = "2024-01-15"
 
-[[changelog]]
+[[prompts]]
+version = "1.0.0"
+content = "Initial template content"
+created_at = "2024-01-01"
+
+[[prompts]]
 version = "1.2.0"
-date = "2024-01-15"
-changes = ["Added new feature", "Fixed bug"]
+content = "Updated template content"
+created_at = "2024-01-15"
 			`.trim();
 
 			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), tomlContent);
 
 			const result = await parsePromptToml(TEST_DIR);
 
-			expect(result).toEqual({
-				content: 'Test template content',
-				version: '1.2.0',
-				changelog: [
-					{
-						version: '1.2.0',
-						date: '2024-01-15',
-						changes: ['Added new feature', 'Fixed bug'],
-					},
-				],
-			});
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value).toEqual({
+					content: 'Updated template content',
+					version: '1.2.0',
+					prompts: [
+						{
+							version: '1.0.0',
+							content: 'Initial template content',
+							created_at: '2024-01-01',
+						},
+						{
+							version: '1.2.0',
+							content: 'Updated template content',
+							created_at: '2024-01-15',
+						},
+					],
+				});
+			}
 		});
 
-		it('should parse TOML with multiple changelog entries and return latest', async () => {
+		it('should parse TOML with multiple prompt versions', async () => {
 			const tomlContent = `
-[prompt]
-version = "2.0.0"
-template = "Updated template"
+[metadata]
+current_version = "2.0.0"
+created_at = "2024-01-01"
+updated_at = "2024-02-01"
 
-[[changelog]]
-version = "2.0.0"
-date = "2024-02-01"
-changes = ["Major update"]
+[[prompts]]
+version = "1.0.0"
+content = "First version"
+created_at = "2024-01-01"
 
-[[changelog]]
+[[prompts]]
 version = "1.5.0"
-date = "2024-01-20"
-changes = ["Minor improvements"]
+content = "Second version"
+created_at = "2024-01-20"
 
-[[changelog]]
-version = "1.0.0"
-date = "2024-01-01"
-changes = ["Initial version"]
+[[prompts]]
+version = "2.0.0"
+content = "Latest version"
+created_at = "2024-02-01"
 			`.trim();
 
 			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), tomlContent);
 
 			const result = await parsePromptToml(TEST_DIR);
 
-			expect(result.version).toBe('2.0.0');
-			expect(result.changelog).toHaveLength(3);
-			expect(result.changelog[0].version).toBe('2.0.0'); // Latest should be first
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value.version).toBe('2.0.0');
+				expect(result.value.content).toBe('Latest version');
+				expect(result.value.prompts).toHaveLength(3);
+			}
 		});
 
-		it('should handle Japanese content in template and changelog', async () => {
+		it('should handle Japanese content in prompts', async () => {
 			const tomlContent = `
-[prompt]
-version = "1.0.0"
-template = "これは日本語のテンプレートです"
+[metadata]
+current_version = "1.0.0"
+created_at = "2024-01-01"
+updated_at = "2024-01-01"
 
-[[changelog]]
+[[prompts]]
 version = "1.0.0"
-date = "2024-01-01"
-changes = ["初期バージョンを作成", "日本語サポートを追加"]
+content = "これは日本語のプロンプトです"
+created_at = "2024-01-01"
 			`.trim();
 
 			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), tomlContent);
 
 			const result = await parsePromptToml(TEST_DIR);
 
-			expect(result.content).toBe('これは日本語のテンプレートです');
-			expect(result.changelog[0].changes).toContain('初期バージョンを作成');
-			expect(result.changelog[0].changes).toContain('日本語サポートを追加');
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value.content).toBe('これは日本語のプロンプトです');
+			}
 		});
 
 		it('should throw error when prompt.toml file does not exist', async () => {
-			await expect(parsePromptToml(TEST_DIR)).rejects.toThrow();
+			const result = await parsePromptToml(TEST_DIR);
+			expect(result.isErr()).toBe(true);
 		});
 
 		it('should throw error when TOML is malformed', async () => {
 			const invalidToml = `
-version = "1.0.0
-template = "Missing quote
+[metadata]
+current_version = "1.0.0
+created_at = "2024-01-01"
 			`.trim();
 
 			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), invalidToml);
 
-			await expect(parsePromptToml(TEST_DIR)).rejects.toThrow();
+			const result = await parsePromptToml(TEST_DIR);
+			expect(result.isErr()).toBe(true);
 		});
 
-		it('should throw error when required fields are missing', async () => {
+		it('should throw error when metadata section is missing', async () => {
 			const incompleteToml = `
-[prompt]
+[[prompts]]
 version = "1.0.0"
-# template field is missing
+content = "Test content"
+created_at = "2024-01-01"
 			`.trim();
 
 			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), incompleteToml);
 
-			await expect(parsePromptToml(TEST_DIR)).rejects.toThrow(
-				'Invalid TOML: missing prompt.template',
-			);
+			const result = await parsePromptToml(TEST_DIR);
+			expect(result.isErr()).toBe(true);
 		});
 
-		it('should handle TOML without changelog', async () => {
-			const tomlWithoutChangelog = `
-[prompt]
-version = "1.0.0"
-template = "Test template"
+		it('should throw error when prompts array is missing', async () => {
+			const incompleteToml = `
+[metadata]
+current_version = "1.0.0"
+created_at = "2024-01-01"
+updated_at = "2024-01-01"
 			`.trim();
 
-			await fs.writeFile(
-				path.join(TEST_DIR, 'prompt.toml'),
-				tomlWithoutChangelog,
-			);
+			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), incompleteToml);
 
 			const result = await parsePromptToml(TEST_DIR);
-			expect(result.changelog).toEqual([]);
+			expect(result.isErr()).toBe(true);
 		});
 
-		it('should handle multi-line template content', async () => {
-			const tomlContent = `
-[prompt]
+		it('should throw error when current_version does not exist in prompts', async () => {
+			const invalidToml = `
+[metadata]
+current_version = "2.0.0"
+created_at = "2024-01-01"
+updated_at = "2024-01-01"
+
+[[prompts]]
 version = "1.0.0"
-template = """
-This is a multi-line template.
+content = "Test content"
+created_at = "2024-01-01"
+			`.trim();
+
+			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), invalidToml);
+
+			const result = await parsePromptToml(TEST_DIR);
+			expect(result.isErr()).toBe(true);
+		});
+
+		it('should handle multi-line prompt content', async () => {
+			const tomlContent = `
+[metadata]
+current_version = "1.0.0"
+created_at = "2024-01-01"
+updated_at = "2024-01-01"
+
+[[prompts]]
+version = "1.0.0"
+content = """
+This is a multi-line prompt.
 
 It can contain multiple paragraphs
 and preserve formatting.
 """
-
-[[changelog]]
-version = "1.0.0"
-date = "2024-01-01"
-changes = ["Initial version with multi-line support"]
+created_at = "2024-01-01"
 			`.trim();
 
 			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), tomlContent);
 
 			const result = await parsePromptToml(TEST_DIR);
 
-			expect(result.content).toContain('This is a multi-line template.');
-			expect(result.content).toContain('It can contain multiple paragraphs');
+			expect(result.isOk()).toBe(true);
+			if (result.isOk()) {
+				expect(result.value.content).toContain('This is a multi-line prompt.');
+				expect(result.value.content).toContain(
+					'It can contain multiple paragraphs',
+				);
+			}
+		});
+
+		it('should validate version format in all prompts', async () => {
+			const invalidToml = `
+[metadata]
+current_version = "1.0.0"
+created_at = "2024-01-01"
+updated_at = "2024-01-01"
+
+[[prompts]]
+version = "invalid-version"
+content = "Test content"
+created_at = "2024-01-01"
+			`.trim();
+
+			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), invalidToml);
+
+			const result = await parsePromptToml(TEST_DIR);
+			expect(result.isErr()).toBe(true);
+		});
+
+		it('should throw error when prompt content is empty', async () => {
+			const invalidToml = `
+[metadata]
+current_version = "1.0.0"
+created_at = "2024-01-01"
+updated_at = "2024-01-01"
+
+[[prompts]]
+version = "1.0.0"
+content = ""
+created_at = "2024-01-01"
+			`.trim();
+
+			await fs.writeFile(path.join(TEST_DIR, 'prompt.toml'), invalidToml);
+
+			const result = await parsePromptToml(TEST_DIR);
+			expect(result.isErr()).toBe(true);
 		});
 	});
 });
