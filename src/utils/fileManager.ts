@@ -15,10 +15,25 @@ export interface OutputMetadata {
 	timestamp: string;
 }
 
+export interface TopicFileMetadata {
+	topic: string;
+	prompt_version: string;
+	timestamp: string;
+}
+
 export function generateFrontmatter(metadata: OutputMetadata): string {
 	return `---
 version: "${metadata.version}"
 model: "${metadata.model}"
+timestamp: "${metadata.timestamp}"
+---
+`;
+}
+
+export function generateTopicFrontmatter(metadata: TopicFileMetadata): string {
+	return `---
+topic: "${metadata.topic}"
+prompt_version: "${metadata.prompt_version}"
 timestamp: "${metadata.timestamp}"
 ---
 `;
@@ -153,4 +168,74 @@ export function normalizeModelName(model: string): string {
 	};
 
 	return modelMap[normalizedModel] || model;
+}
+
+/**
+ * Create topic file for create action
+ * Generates a file with frontmatter but empty body for user to fill
+ */
+export async function createTopicFile(
+	promptPath: string,
+	topic: string,
+	promptVersion: string,
+): Promise<Result<string, ValidationError | OutputWriteError>> {
+	// Validate inputs
+	if (!promptPath || typeof promptPath !== 'string') {
+		return err(new ValidationError('Prompt path', 'a string'));
+	}
+
+	if (!topic || typeof topic !== 'string') {
+		return err(new ValidationError('Topic', 'a string'));
+	}
+
+	if (!promptVersion || typeof promptVersion !== 'string') {
+		return err(new ValidationError('Prompt version', 'a string'));
+	}
+
+	const outputsDir = join(promptPath, 'outputs');
+	const timestamp = generateTimestamp();
+
+	// Generate filename based on topic
+	const sanitizedTopic = topic.replace(/[<>:"/\\|?*]/g, '_'); // Sanitize for filename
+	const fileName = `${sanitizedTopic}.md`;
+	const filePath = join(outputsDir, fileName);
+
+	const frontmatter = generateTopicFrontmatter({
+		topic,
+		prompt_version: promptVersion,
+		timestamp,
+	});
+
+	// Create file with frontmatter and empty body
+	const fileContent = `${frontmatter}\n`;
+
+	try {
+		// Ensure outputs directory exists
+		await mkdir(outputsDir, { recursive: true });
+
+		// Write the file
+		await writeFile(filePath, fileContent, 'utf-8');
+
+		return ok(filePath);
+	} catch (error) {
+		if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
+			return err(
+				new OutputWriteError(
+					outputsDir,
+					'Permission denied. Please check file permissions',
+				),
+			);
+		}
+		if (error instanceof Error && 'code' in error && error.code === 'ENOSPC') {
+			return err(
+				new OutputWriteError(
+					outputsDir,
+					'No space left on device. Please free up disk space',
+				),
+			);
+		}
+		return err(
+			new OutputWriteError(outputsDir, `Failed to create topic file: ${error}`),
+		);
+	}
 }

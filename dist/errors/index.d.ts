@@ -53,11 +53,6 @@ export declare class TomlVersionFormatError extends PromptsError {
     readonly category = "configuration";
     constructor(tomlPath: string);
 }
-export declare class TomlChangelogError extends PromptsError {
-    readonly code = "TOML_CHANGELOG_ERROR";
-    readonly category = "configuration";
-    constructor(tomlPath: string, entryIndex: number, reason: string);
-}
 export declare class ClipboardEmptyError extends PromptsError {
     readonly code = "CLIPBOARD_EMPTY";
     readonly category = "input";

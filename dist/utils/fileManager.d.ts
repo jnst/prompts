@@ -5,9 +5,20 @@ export interface OutputMetadata {
     model: string;
     timestamp: string;
 }
+export interface TopicFileMetadata {
+    topic: string;
+    prompt_version: string;
+    timestamp: string;
+}
 export declare function generateFrontmatter(metadata: OutputMetadata): string;
+export declare function generateTopicFrontmatter(metadata: TopicFileMetadata): string;
 export declare function generateTimestamp(): string;
 export declare function generateFileName(timestamp: string): string;
 export declare function saveOutput(promptPath: string, content: string, metadata: OutputMetadata): Promise<Result<string, ValidationError | ModelRequiredError | ModelEmptyError | ModelValidationError | OutputWriteError>>;
 export declare function validateModel(model: string): Result<void, ModelRequiredError | ModelEmptyError | ModelValidationError>;
 export declare function normalizeModelName(model: string): string;
+/**
+ * Create topic file for create action
+ * Generates a file with frontmatter but empty body for user to fill
+ */
+export declare function createTopicFile(promptPath: string, topic: string, promptVersion: string): Promise<Result<string, ValidationError | OutputWriteError>>;

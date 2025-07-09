@@ -63,7 +63,7 @@ export class TomlStructureError extends PromptsError {
     code = 'TOML_STRUCTURE_ERROR';
     category = 'configuration';
     constructor(tomlPath) {
-        super(`Invalid TOML structure in: ${tomlPath}\nRequired: [prompt] section with 'template' and 'version' fields`);
+        super(`Invalid TOML structure in: ${tomlPath}\nRequired: [metadata] section with 'current_version', 'created_at', 'updated_at' and [[prompts]] array with 'version', 'content', 'created_at' fields`);
     }
 }
 export class TomlEmptyTemplateError extends PromptsError {
@@ -78,13 +78,6 @@ export class TomlVersionFormatError extends PromptsError {
     category = 'configuration';
     constructor(tomlPath) {
         super(`Invalid version format in: ${tomlPath}\nExpected format: X.Y.Z (e.g., "1.0.0")`);
-    }
-}
-export class TomlChangelogError extends PromptsError {
-    code = 'TOML_CHANGELOG_ERROR';
-    category = 'configuration';
-    constructor(tomlPath, entryIndex, reason) {
-        super(`Invalid changelog entry ${entryIndex} in: ${tomlPath}\n${reason}`);
     }
 }
 // Clipboard errors

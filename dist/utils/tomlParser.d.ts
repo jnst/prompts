@@ -1,21 +1,23 @@
 import { type Result } from 'neverthrow';
-import { TomlChangelogError, TomlEmptyError, TomlEmptyTemplateError, TomlNotFoundError, TomlStructureError, TomlSyntaxError, TomlVersionFormatError } from '../errors/index.js';
+import { TomlEmptyError, TomlEmptyTemplateError, TomlNotFoundError, TomlStructureError, TomlSyntaxError, TomlVersionFormatError } from '../errors/index.js';
 export interface PromptTemplate {
     content: string;
     version: string;
-    changelog: ChangelogEntry[];
+    prompts: PromptEntry[];
 }
-export interface ChangelogEntry {
+export interface PromptEntry {
     version: string;
-    date: string;
-    changes: string[];
+    content: string;
+    created_at: string;
+}
+export interface TomlMetadata {
+    current_version: string;
+    created_at: string;
+    updated_at: string;
 }
 export interface TomlData {
-    prompt: {
-        template: string;
-        version: string;
-    };
-    changelog: ChangelogEntry[];
+    metadata: TomlMetadata;
+    prompts: PromptEntry[];
 }
-export declare function parsePromptToml(promptPath: string): Promise<Result<PromptTemplate, TomlNotFoundError | TomlEmptyError | TomlSyntaxError | TomlStructureError | TomlEmptyTemplateError | TomlVersionFormatError | TomlChangelogError>>;
+export declare function parsePromptToml(promptPath: string): Promise<Result<PromptTemplate, TomlNotFoundError | TomlEmptyError | TomlSyntaxError | TomlStructureError | TomlEmptyTemplateError | TomlVersionFormatError>>;
 export declare function validateTomlStructure(data: unknown): data is TomlData;

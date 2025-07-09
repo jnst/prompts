@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { err, ok } from 'neverthrow';
 import { parse } from 'smol-toml';
-import { TomlChangelogError, TomlEmptyError, TomlEmptyTemplateError, TomlNotFoundError, TomlStructureError, TomlSyntaxError, TomlVersionFormatError, } from '../errors/index.js';
+import { TomlEmptyError, TomlEmptyTemplateError, TomlNotFoundError, TomlStructureError, TomlSyntaxError, TomlVersionFormatError, } from '../errors/index.js';
 export async function parsePromptToml(promptPath) {
     const tomlPath = join(promptPath, 'prompt.toml');
     try {
@@ -24,32 +24,38 @@ export async function parsePromptToml(promptPath) {
             return err(new TomlStructureError(tomlPath));
         }
         const tomlData = data;
-        // Validate template content
-        if (tomlData.prompt.template.trim().length === 0) {
-            return err(new TomlEmptyTemplateError(tomlPath));
-        }
         // Validate version format (basic semver check)
         const versionRegex = /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/;
-        if (!versionRegex.test(tomlData.prompt.version)) {
+        if (!versionRegex.test(tomlData.metadata.current_version)) {
             return err(new TomlVersionFormatError(tomlPath));
         }
-        // Validate changelog if present
-        if (tomlData.changelog && tomlData.changelog.length > 0) {
-            for (const [index, entry] of tomlData.changelog.entries()) {
-                if (!entry.version || !entry.date || !entry.changes) {
-                    return err(new TomlChangelogError(tomlPath, index + 1, 'Required: version, date, and changes fields'));
-                }
-                if (!Array.isArray(entry.changes) || entry.changes.length === 0) {
-                    return err(new TomlChangelogError(tomlPath, index + 1, 'Must have non-empty changes array'));
-                }
+        // Validate prompts array
+        if (!tomlData.prompts || tomlData.prompts.length === 0) {
+            return err(new TomlStructureError(tomlPath));
+        }
+        // Validate each prompt entry
+        for (const entry of tomlData.prompts) {
+            if (!entry.version || !entry.content || !entry.created_at) {
+                return err(new TomlStructureError(tomlPath));
+            }
+            if (!versionRegex.test(entry.version)) {
+                return err(new TomlVersionFormatError(tomlPath));
+            }
+            if (entry.content.trim().length === 0) {
+                return err(new TomlEmptyTemplateError(tomlPath));
             }
         }
-        // Get latest version from changelog (array index 0)
-        const latestVersion = tomlData.changelog?.[0]?.version || tomlData.prompt.version;
+        // Validate current_version exists in prompts
+        const currentVersionExists = tomlData.prompts.some((p) => p.version === tomlData.metadata.current_version);
+        if (!currentVersionExists) {
+            return err(new TomlStructureError(tomlPath));
+        }
+        // Get current version content
+        const currentPrompt = tomlData.prompts.find((p) => p.version === tomlData.metadata.current_version);
         return ok({
-            content: tomlData.prompt.template,
-            version: latestVersion,
-            changelog: tomlData.changelog || [],
+            content: currentPrompt.content,
+            version: tomlData.metadata.current_version,
+            prompts: tomlData.prompts,
         });
     }
     catch (error) {
@@ -65,18 +71,31 @@ export function validateTomlStructure(data) {
     }
     // Use explicit interface to avoid index signature issues
     const obj = data;
-    // Check prompt section
-    if (!obj.prompt || typeof obj.prompt !== 'object') {
+    // Check metadata section
+    if (!obj.metadata || typeof obj.metadata !== 'object') {
         return false;
     }
-    const prompt = obj.prompt;
-    if (typeof prompt.template !== 'string' ||
-        typeof prompt.version !== 'string') {
+    const metadata = obj.metadata;
+    if (typeof metadata.current_version !== 'string' ||
+        typeof metadata.created_at !== 'string' ||
+        typeof metadata.updated_at !== 'string') {
         return false;
     }
-    // Changelog is optional
-    if (obj.changelog && !Array.isArray(obj.changelog)) {
+    // Check prompts array
+    if (!obj.prompts || !Array.isArray(obj.prompts)) {
         return false;
+    }
+    // Validate each prompt entry
+    for (const prompt of obj.prompts) {
+        if (!prompt || typeof prompt !== 'object') {
+            return false;
+        }
+        const entry = prompt;
+        if (typeof entry.version !== 'string' ||
+            typeof entry.content !== 'string' ||
+            typeof entry.created_at !== 'string') {
+            return false;
+        }
     }
     return true;
 }
