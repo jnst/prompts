@@ -229,3 +229,14 @@ export class ClipboardShortWarning extends PromptsWarning {
 		);
 	}
 }
+
+export class FileFormatError extends PromptsError {
+	readonly code = 'FILE_FORMAT_ERROR';
+	readonly category = 'validation';
+
+	constructor(filePath: string) {
+		super(
+			`File format error in: ${filePath}\nFile does not have valid frontmatter structure`,
+		);
+	}
+}

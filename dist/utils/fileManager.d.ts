@@ -1,5 +1,5 @@
 import { type Result } from 'neverthrow';
-import { ModelEmptyError, ModelRequiredError, ModelValidationError, OutputWriteError, ValidationError } from '../errors/index.js';
+import { FileFormatError, ModelEmptyError, ModelRequiredError, ModelValidationError, OutputWriteError, ValidationError } from '../errors/index.js';
 export interface OutputMetadata {
     version: string;
     model: string;
@@ -69,7 +69,7 @@ export declare function detectFilledFiles(promptPath: string): Promise<Result<Fi
 /**
  * Clear file content while preserving frontmatter (if exists)
  */
-export declare function clearFileContent(filePath: string): Promise<Result<string, ValidationError | OutputWriteError>>;
+export declare function clearFileContent(filePath: string): Promise<Result<string, ValidationError | OutputWriteError | FileFormatError>>;
 /**
  * Remove file completely
  */

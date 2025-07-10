@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { err, ok, type Result } from 'neverthrow';
 import {
+	FileFormatError,
 	ModelEmptyError,
 	ModelRequiredError,
 	ModelValidationError,
@@ -70,7 +71,7 @@ timestamp: "${metadata.timestamp}"
 }
 
 export function generateTimestamp(): string {
-	return new Date().toISOString();
+	return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
 export function generateFileName(timestamp: string): string {
@@ -620,7 +621,9 @@ export async function detectFilledFiles(
  */
 export async function clearFileContent(
 	filePath: string,
-): Promise<Result<string, ValidationError | OutputWriteError>> {
+): Promise<
+	Result<string, ValidationError | OutputWriteError | FileFormatError>
+> {
 	// Validate inputs
 	if (!filePath || typeof filePath !== 'string') {
 		return err(new ValidationError('File path', 'a string'));
@@ -650,8 +653,8 @@ export async function clearFileContent(
 				await writeFile(filePath, '', 'utf-8');
 			}
 		} else {
-			// File has no frontmatter, clear entire file
-			await writeFile(filePath, '', 'utf-8');
+			// File has no frontmatter, return error
+			return err(new FileFormatError(filePath));
 		}
 
 		return ok(filePath);

@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { err, ok } from 'neverthrow';
-import { ModelEmptyError, ModelRequiredError, ModelValidationError, OutputWriteError, ValidationError, } from '../errors/index.js';
+import { FileFormatError, ModelEmptyError, ModelRequiredError, ModelValidationError, OutputWriteError, ValidationError, } from '../errors/index.js';
 export function generateFrontmatter(metadata) {
     return `---
 version: "${metadata.version}"
@@ -19,7 +19,7 @@ timestamp: "${metadata.timestamp}"
 `;
 }
 export function generateTimestamp() {
-    return new Date().toISOString();
+    return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 export function generateFileName(timestamp) {
     // Convert ISO timestamp to filename-safe format
@@ -425,8 +425,8 @@ export async function clearFileContent(filePath) {
             }
         }
         else {
-            // File has no frontmatter, clear entire file
-            await writeFile(filePath, '', 'utf-8');
+            // File has no frontmatter, return error
+            return err(new FileFormatError(filePath));
         }
         return ok(filePath);
     }

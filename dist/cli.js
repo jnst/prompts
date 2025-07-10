@@ -78,7 +78,7 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
             setUnfilledFiles(unfilledResult.value);
             setState('file-selecting');
         }
-        else if (action.id === 'clear' || action.id === 'remove') {
+        else if (action.id === 'reset' || action.id === 'delete') {
             if (!selectedPrompt) {
                 setErrorMessage('No prompt selected');
                 setState('error');
@@ -93,13 +93,13 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
                 return;
             }
             // Filter files based on action
-            if (action.id === 'clear') {
-                // For clear: only files with content
+            if (action.id === 'reset') {
+                // For reset: only files with content
                 const filesWithContent = outputResult.value.filter((file) => file.hasContent);
                 setOutputFiles(filesWithContent);
             }
             else {
-                // For remove: all files
+                // For delete: all files
                 setOutputFiles(outputResult.value);
             }
             setState('file-selecting');
@@ -173,25 +173,25 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
                 }
                 setSuccessMessage(`Successfully filled file: ${file.fileName}\nContent added from clipboard!`);
             }
-            else if (selectedAction?.id === 'clear') {
-                // Clear file content while preserving frontmatter
-                const clearResult = await clearFileContent(file.path);
-                if (clearResult.isErr()) {
-                    setErrorMessage(clearResult.error.message);
+            else if (selectedAction?.id === 'reset') {
+                // Reset file content while preserving frontmatter
+                const resetResult = await clearFileContent(file.path);
+                if (resetResult.isErr()) {
+                    setErrorMessage(resetResult.error.message);
                     setState('error');
                     return;
                 }
-                setSuccessMessage(`Successfully cleared file: ${file.fileName}\nFrontmatter preserved, content removed!`);
+                setSuccessMessage(`Successfully reset file: ${file.fileName}\nFrontmatter preserved, content removed!`);
             }
-            else if (selectedAction?.id === 'remove') {
-                // Remove file completely
-                const removeResult = await removeFile(file.path);
-                if (removeResult.isErr()) {
-                    setErrorMessage(removeResult.error.message);
+            else if (selectedAction?.id === 'delete') {
+                // Delete file completely
+                const deleteResult = await removeFile(file.path);
+                if (deleteResult.isErr()) {
+                    setErrorMessage(deleteResult.error.message);
                     setState('error');
                     return;
                 }
-                setSuccessMessage(`Successfully removed file: ${file.fileName}\nFile deleted completely!`);
+                setSuccessMessage(`Successfully deleted file: ${file.fileName}\nFile deleted completely!`);
             }
             setState('success');
             setTimeout(() => {
@@ -238,11 +238,11 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
             { id: 'create', name: 'create', description: 'Create new topic file' },
             { id: 'fill', name: 'fill', description: 'Fill existing empty file' },
             {
-                id: 'clear',
-                name: 'clear',
-                description: 'Clear file content (keep frontmatter)',
+                id: 'reset',
+                name: 'reset',
+                description: 'Reset file to empty state (keep frontmatter)',
             },
-            { id: 'remove', name: 'remove', description: 'Remove file completely' },
+            { id: 'delete', name: 'delete', description: 'Delete file completely' },
         ];
         return (_jsx(ActionList, { actions: actions, onSelect: handleActionSelect, onExit: handleBackToPromptSelection }));
     }
@@ -255,8 +255,8 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
         if (selectedAction?.id === 'fill') {
             files = unfilledFiles;
         }
-        else if (selectedAction?.id === 'clear' ||
-            selectedAction?.id === 'remove') {
+        else if (selectedAction?.id === 'reset' ||
+            selectedAction?.id === 'delete') {
             files = outputFiles;
         }
         return (_jsx(FileList, { files: files, onSelect: handleFileSelect, onExit: handleBackToActionSelection }));

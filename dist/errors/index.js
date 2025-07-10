@@ -158,3 +158,10 @@ export class ClipboardShortWarning extends PromptsWarning {
         super('Warning: Clipboard content is very short (less than 3 characters)', 'CLIPBOARD_SHORT');
     }
 }
+export class FileFormatError extends PromptsError {
+    code = 'FILE_FORMAT_ERROR';
+    category = 'validation';
+    constructor(filePath) {
+        super(`File format error in: ${filePath}\nFile does not have valid frontmatter structure`);
+    }
+}

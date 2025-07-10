@@ -289,3 +289,11 @@
 - [x] 全ファイル形式対応
 - [x] アクション名改善（clear→reset, remove→delete）
 - [x] エラーハンドリング強化
+
+## 11. 品質改善 (Quality Improvements)
+
+### 11.1 Timestamp Format Improvement ✅
+- [x] frontmatterのtimestampからミリ秒を削除
+  - [x] `generateTimestamp()` 関数の修正
+  - [x] テストの更新
+  - [x] ISO 8601形式の維持（秒単位まで）

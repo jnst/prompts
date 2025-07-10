@@ -104,3 +104,8 @@ export declare class VaultEmptyWarning extends PromptsWarning {
 export declare class ClipboardShortWarning extends PromptsWarning {
     constructor();
 }
+export declare class FileFormatError extends PromptsError {
+    readonly code = "FILE_FORMAT_ERROR";
+    readonly category = "validation";
+    constructor(filePath: string);
+}
