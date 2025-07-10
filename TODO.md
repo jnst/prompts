@@ -143,7 +143,8 @@
 
 - **MVP完了**: 基本的なCLI機能が動作
 - **品質管理完了**: lint, format, typecheck, check の全スクリプトが動作
-- **次の優先タスク**: テスト実装 (Phase 3)
+- **アクション指向UI完了**: create機能によるトピック指定ファイル作成機能が動作
+- **次の優先タスク**: fill機能実装 (Phase 5)
 
 ## 📝 新規追加項目
 
@@ -159,23 +160,23 @@
   - [x] `stdin` TTY検出による条件付きレンダリング
 - [x] React key重複警告の修正
 
-## 8. 新機能実装 (サブコマンド拡張)
+## 8. 新機能実装 (アクション指向UI) ✅
 
-### 8.1 プロンプト特化サブコマンド
-- [ ] `create` サブコマンド実装
-  - [ ] `prompt create {{topic}}` でトピック指定出力ファイル作成
-  - [ ] `outputs/{{topic}}.md` ファイル生成
-  - [ ] front matter に以下を含める:
-    - [ ] `topic: "{{topic}}"` 
-    - [ ] `prompt_version: "1.0.0"` (現在のプロンプトバージョン)
-    - [ ] `timestamp: "2025-07-07T00:00:00Z"` (ISO8601形式)
-  - [ ] ファイル本体は空（回答記入待ち状態）
-  - [ ] **プロンプト内容をクリップボードにコピー**
-    - [ ] プロンプトテンプレートの `{{topic}}` を実際の値に置換
-    - [ ] 置換済みプロンプトを `pbcopy` でクリップボードにコピー
-    - [ ] 既存clipboard.ts の出力機能を活用
+### 8.1 プロンプト特化アクション ✅
+- [x] `create` アクション実装
+  - [x] トピック指定での出力ファイル作成
+  - [x] `outputs/{{topic}}.md` ファイル生成
+  - [x] front matter に以下を含める:
+    - [x] `topic: "{{topic}}"` 
+    - [x] `prompt_version: "1.0.0"` (現在のプロンプトバージョン)
+    - [x] `timestamp: "2025-07-07T00:00:00Z"` (ISO8601形式)
+  - [x] ファイル本体は空（回答記入待ち状態）
+  - [x] **プロンプト内容をクリップボードにコピー**
+    - [x] プロンプトテンプレートの `{{topic}}` を実際の値に置換
+    - [x] 置換済みプロンプトを `pbcopy` でクリップボードにコピー
+    - [x] 既存clipboard.ts の出力機能を活用
 
-- [ ] `fill` サブコマンド実装  
+- [ ] `fill` アクション実装  
   - [ ] 回答が未記入なファイルの検出機能
     - [ ] front matter があり、本体が空のファイルをスキャン
     - [ ] `outputs/` ディレクトリ内の対象ファイル一覧表示
@@ -186,45 +187,59 @@
     - [ ] 既存clipboard.ts機能を再利用
     - [ ] 選択ファイルの本体部分に追記
 
-### 8.2 CLI インターフェース拡張
-- [ ] サブコマンド解析機能
-  - [ ] `src/utils/commandParser.ts` 作成
-  - [ ] `prompt create <topic>` 形式の解析
-  - [ ] `prompt fill` 形式の解析
-  - [ ] 既存の基本モード（プロンプト選択）との共存
+### 8.2 CLI インターフェース拡張 ✅
+- [x] アクション選択機能
+  - [x] プロンプト選択後のアクション選択UI
+  - [x] `create` と `fill` アクションの提供
+  - [x] 既存の基本モード（プロンプト選択）との統合
 
-- [ ] ファイル管理機能拡張
-  - [ ] `src/utils/fileManager.ts` 拡張
+- [x] ファイル管理機能拡張
+  - [x] `src/utils/fileManager.ts` 拡張
+  - [x] トピック指定ファイル生成機能 (`createTopicFile`)
+  - [x] トピック専用frontmatter生成機能
   - [ ] 未記入ファイル検出機能
-  - [ ] トピック指定ファイル生成機能
   - [ ] ファイル内容更新機能（追記モード）
 
-- [ ] プロンプト置換機能実装
-  - [ ] `src/utils/promptProcessor.ts` 作成
-  - [ ] `{{topic}}` → 実際の値への置換処理
-  - [ ] テンプレート変数の抽出・検証機能
-  - [ ] clipboard.ts拡張でpbcopy出力機能追加
+- [x] プロンプト置換機能実装
+  - [x] `src/utils/promptProcessor.ts` 作成
+  - [x] `{{topic}}` → 実際の値への置換処理
+  - [x] テンプレート変数の抽出・検証機能
+  - [x] clipboard.ts拡張でpbcopy出力機能追加
 
-### 8.3 UI コンポーネント拡張
+### 8.3 UI コンポーネント拡張 ✅
+- [x] `src/components/ActionList.tsx` 作成
+  - [x] アクション一覧表示（create, fill）
+  - [x] インタラクティブ選択機能
+  - [x] 矢印キーとEnterキーでの操作
+
+- [x] `src/components/TopicInput.tsx` 作成
+  - [x] トピック入力UI
+  - [x] バリデーション機能
+  - [x] キャンセル機能
+
 - [ ] `src/components/FileList.tsx` 作成
   - [ ] 未記入ファイル一覧表示
   - [ ] topic名とファイル名表示
   - [ ] インタラクティブ選択機能
 
 ### 8.4 テスト実装
-- [ ] `src/utils/commandParser.test.ts`
+- [ ] `src/utils/promptProcessor.test.ts`
+- [ ] `src/components/ActionList.test.ts`
+- [ ] `src/components/TopicInput.test.ts`
 - [ ] `src/components/FileList.test.ts` 
 - [ ] 拡張されたfileManager機能のテスト
-- [ ] サブコマンド統合テスト
+- [ ] アクション統合テスト
 
-## 9. サブコマンド実装優先度
+## 9. 実装優先度
 
-**Phase 4 (サブコマンド実装): 🔄 計画中**
-- [ ] コマンド解析とサブコマンド分岐
-- [ ] `create` サブコマンド基本機能
-- [ ] `fill` サブコマンド基本機能
+**Phase 4 (アクション指向UI): ✅ 完了**
+- [x] プロンプト選択後のアクション選択UI
+- [x] `create` アクション基本機能
+- [x] トピック入力とファイル生成機能
+- [x] プロンプト置換とクリップボード連携
 
-**Phase 5 (UI/UX向上): 📋 予定**  
-- [ ] ファイル選択UIの改善
+**Phase 5 (fill機能とUI/UX向上): 🔄 進行中**  
+- [ ] `fill` アクション基本機能
+- [ ] 未記入ファイル検出・選択UI
 - [ ] エラーハンドリング強化
 - [ ] 使用方法ドキュメント更新

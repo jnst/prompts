@@ -71,8 +71,9 @@ ERROR_SPECIFICATION.md   # Comprehensive error handling documentation
 - Renders React Ink app with parsed configuration
 
 **2. State Management (src/cli.tsx):**
-- Uses React hooks for state: 'loading' | 'selecting' | 'processing' | 'success' | 'error'
-- Manages vault scanning, prompt selection, and output generation flow
+- Uses React hooks for state: 'loading' | 'selecting' | 'action-selecting' | 'topic-input' | 'processing' | 'success' | 'error'
+- Manages vault scanning, prompt selection, action selection, and output generation flow
+- Action-oriented workflow: prompt selection → action selection → topic input (for create) → processing
 - Handles errors with user-friendly messages
 
 **3. Core Utilities Pattern (Result-based Error Handling):**
@@ -80,13 +81,16 @@ ERROR_SPECIFICATION.md   # Comprehensive error handling documentation
 - `tomlParser`: Parse prompt.toml with metadata/prompts structure → Result<PromptTemplate, TomlError>
 - `clipboard`: macOS pbpaste/pbcopy integration → Result<{content, warnings}, ClipboardError>
 - `fileManager`: Output file generation with frontmatter → Result<string, OutputError>
+- `promptProcessor`: Template variable replacement ({{topic}} → actual values) → Result<ProcessedPrompt, ValidationError>
 
 **4. UI Components (React Ink):**
 - `PromptList`: Interactive selection with arrow keys and enter
+- `ActionList`: Action selection UI (create/fill) with keyboard navigation
+- `TopicInput`: Text input component for topic entry with validation
 - State-driven UI that responds to application state changes
 - Graceful error handling and user feedback
 - Raw mode detection with fallback UI for non-interactive environments
-- React keys use stable `prompt.path` identifiers (not array indices)
+- React keys use stable identifiers (not array indices)
 
 ### Error Handling Architecture
 
@@ -128,7 +132,9 @@ Your prompt template here with {{placeholders}}
 created_at = "2025-07-07T00:00:00Z"
 ```
 
-**Output File Format:**
+**Output File Formats:**
+
+*Standard Output (from clipboard):*
 ```markdown
 ---
 version: "1.2.0"
@@ -136,6 +142,17 @@ model: "claude-sonnet-4"
 timestamp: "2025-07-07T17:12:41Z"
 ---
 [user content from clipboard]
+```
+
+*Topic File (create action):*
+```markdown
+---
+topic: "example-topic"
+prompt_version: "1.0.0"
+timestamp: "2025-07-07T17:12:41Z"
+---
+
+[empty body for user to fill]
 ```
 
 **Model Handling:**
@@ -146,8 +163,9 @@ timestamp: "2025-07-07T17:12:41Z"
 - `normalizeModelName()` returns original input for unknown models (no silent defaults)
 
 **Clipboard Integration:**
-- Uses macOS pbpaste for input (macOS-specific dependency)
+- Uses macOS pbpaste for input and pbcopy for output (macOS-specific dependency)
 - Input content becomes output file body (after frontmatter)
+- Output: processed prompt templates copied to clipboard for LLM usage
 
 **Type Safety Notes:**
 - Uses Node.js standard APIs (node:fs/promises, node:path)
@@ -184,6 +202,27 @@ timestamp: "2025-07-07T17:12:41Z"
   - Add TypeScript type guards: `if (result.isErr()) return;`
 - Test file naming: `*.test.ts` in same directory as source
 - 31 comprehensive tests cover all utilities (clipboard, tomlParser, fileManager, promptManager)
+
+## Action-Oriented Workflow
+
+**Core User Flow:**
+1. **Prompt Selection**: User selects a prompt from vault directory
+2. **Action Selection**: Choose between 'create' (topic-based file) or 'fill' (existing file)
+3. **Topic Input**: For 'create' action, user enters topic name
+4. **Processing**: Template variables ({{topic}}) replaced with actual values
+5. **Output**: Topic file created + processed prompt copied to clipboard
+
+**Template Variable System:**
+- Prompts can contain `{{topic}}` placeholders
+- `promptProcessor.ts` extracts and replaces template variables
+- `extractVariables()` finds all `{{variable}}` patterns in templates
+- `processTemplate()` performs variable substitution with validation
+- `processTopicTemplate()` convenience function for single topic replacement
+
+**File Management:**
+- `createTopicFile()` generates topic-specific files with custom frontmatter
+- Topic files use different frontmatter format (topic, prompt_version, timestamp)
+- Files created with empty body for user to fill with LLM responses
 
 ## Project Management
 - Implement tasks according to @TODO.md. Update the Tasklist in TODO.md as work progresses.
