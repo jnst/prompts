@@ -1,7 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { normalizeModelName, saveOutput } from './fileManager.js';
+import {
+	createTopicFile,
+	detectUnfilledFiles,
+	normalizeModelName,
+	saveOutput,
+	updateFileContent,
+} from './fileManager.js';
 
 const TEST_PROMPT_PATH = path.join(process.cwd(), 'test-prompt');
 const TEST_OUTPUTS_PATH = path.join(TEST_PROMPT_PATH, 'outputs');
@@ -223,6 +229,207 @@ Line 4 after empty line
 			const outputPath = result.value;
 
 			expect(path.extname(outputPath)).toBe('.md');
+		});
+	});
+
+	describe('createTopicFile', () => {
+		it('should create a topic file with correct frontmatter', async () => {
+			const topic = 'test-topic';
+			const promptVersion = '1.0.0';
+
+			const result = await createTopicFile(
+				TEST_PROMPT_PATH,
+				topic,
+				promptVersion,
+			);
+
+			// Check that creation was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const filePath = result.value;
+			const content = await fs.readFile(filePath, 'utf-8');
+
+			// Should contain frontmatter
+			expect(content).toContain('---');
+			expect(content).toContain('topic: "test-topic"');
+			expect(content).toContain('prompt_version: "1.0.0"');
+			expect(content).toContain('timestamp:');
+			expect(content).toContain('---');
+
+			// Should have empty body
+			const lines = content.split('\n');
+			const frontmatterEnd = lines.findIndex(
+				(line, index) => index > 0 && line.startsWith('---'),
+			);
+			const body = lines
+				.slice(frontmatterEnd + 1)
+				.join('\n')
+				.trim();
+			expect(body).toBe('');
+		});
+
+		it('should sanitize topic names for filename', async () => {
+			const topic = 'test<>topic:with/special?characters';
+			const promptVersion = '1.0.0';
+
+			const result = await createTopicFile(
+				TEST_PROMPT_PATH,
+				topic,
+				promptVersion,
+			);
+
+			// Check that creation was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const filePath = result.value;
+			const fileName = path.basename(filePath);
+
+			// Should have sanitized filename but original topic in frontmatter
+			expect(fileName).toBe('test__topic_with_special_characters.md');
+
+			const content = await fs.readFile(filePath, 'utf-8');
+			expect(content).toContain('topic: "test<>topic:with/special?characters"');
+		});
+	});
+
+	describe('detectUnfilledFiles', () => {
+		it('should detect files with empty body', async () => {
+			// Create test topic file
+			const topic = 'empty-topic';
+			const promptVersion = '1.0.0';
+
+			await createTopicFile(TEST_PROMPT_PATH, topic, promptVersion);
+
+			// Create another file with content
+			const filledFilePath = path.join(TEST_OUTPUTS_PATH, 'filled-topic.md');
+			await fs.writeFile(
+				filledFilePath,
+				`---
+topic: "filled-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+This file has content and should not be detected as unfilled.
+`,
+			);
+
+			const result = await detectUnfilledFiles(TEST_PROMPT_PATH);
+
+			// Should detect only the empty file
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const unfilledFiles = result.value;
+			expect(unfilledFiles).toHaveLength(1);
+			expect(unfilledFiles[0].topic).toBe('empty-topic');
+			expect(unfilledFiles[0].fileName).toBe('empty-topic.md');
+		});
+
+		it('should return empty array when no unfilled files exist', async () => {
+			// Create only filled files
+			const filledFilePath = path.join(TEST_OUTPUTS_PATH, 'filled-topic.md');
+			await fs.writeFile(
+				filledFilePath,
+				`---
+topic: "filled-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+This file has content.
+`,
+			);
+
+			const result = await detectUnfilledFiles(TEST_PROMPT_PATH);
+
+			// Should return empty array
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const unfilledFiles = result.value;
+			expect(unfilledFiles).toHaveLength(0);
+		});
+
+		it('should return empty array when outputs directory does not exist', async () => {
+			// Remove outputs directory
+			await fs.rm(TEST_OUTPUTS_PATH, { recursive: true, force: true });
+
+			const result = await detectUnfilledFiles(TEST_PROMPT_PATH);
+
+			// Should return empty array without error
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const unfilledFiles = result.value;
+			expect(unfilledFiles).toHaveLength(0);
+		});
+	});
+
+	describe('updateFileContent', () => {
+		it('should append content to existing file', async () => {
+			// Create test file
+			const testFilePath = path.join(TEST_OUTPUTS_PATH, 'test-file.md');
+			const initialContent = `---
+topic: "test-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+`;
+			await fs.writeFile(testFilePath, initialContent);
+
+			// Update with new content
+			const newContent = 'This is new content added to the file.';
+			const result = await updateFileContent(testFilePath, newContent);
+
+			// Check that update was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const updatedContent = await fs.readFile(testFilePath, 'utf-8');
+			expect(updatedContent).toBe(initialContent + newContent);
+		});
+
+		it('should handle multi-line content', async () => {
+			// Create test file
+			const testFilePath = path.join(TEST_OUTPUTS_PATH, 'test-file.md');
+			const initialContent = `---
+topic: "test-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+`;
+			await fs.writeFile(testFilePath, initialContent);
+
+			// Update with multi-line content
+			const newContent = `Line 1
+Line 2
+
+Line 4 after empty line`;
+			const result = await updateFileContent(testFilePath, newContent);
+
+			// Check that update was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const updatedContent = await fs.readFile(testFilePath, 'utf-8');
+			expect(updatedContent).toContain('Line 1');
+			expect(updatedContent).toContain('Line 2');
+			expect(updatedContent).toContain('Line 4 after empty line');
+		});
+
+		it('should return error for non-existent file', async () => {
+			const nonExistentFile = path.join(TEST_OUTPUTS_PATH, 'does-not-exist.md');
+			const result = await updateFileContent(nonExistentFile, 'some content');
+
+			expect(result.isErr()).toBe(true);
+			if (result.isOk()) return; // Type guard
+
+			expect(result.error.message).toContain('File not found');
 		});
 	});
 });

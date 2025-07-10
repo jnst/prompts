@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { err, ok } from 'neverthrow';
 import { ModelEmptyError, ModelRequiredError, ModelValidationError, OutputWriteError, ValidationError, } from '../errors/index.js';
@@ -145,5 +145,101 @@ export async function createTopicFile(promptPath, topic, promptVersion) {
             return err(new OutputWriteError(outputsDir, 'No space left on device. Please free up disk space'));
         }
         return err(new OutputWriteError(outputsDir, `Failed to create topic file: ${error}`));
+    }
+}
+/**
+ * Detect unfilled files in the outputs directory
+ * Returns files that have frontmatter but empty body
+ */
+export async function detectUnfilledFiles(promptPath) {
+    // Validate inputs
+    if (!promptPath || typeof promptPath !== 'string') {
+        return err(new ValidationError('Prompt path', 'a string'));
+    }
+    const outputsDir = join(promptPath, 'outputs');
+    const unfilledFiles = [];
+    try {
+        // Read all files in outputs directory
+        const files = await readdir(outputsDir);
+        const mdFiles = files.filter((file) => file.endsWith('.md'));
+        for (const fileName of mdFiles) {
+            const filePath = join(outputsDir, fileName);
+            const content = await readFile(filePath, 'utf-8');
+            // Check if file has frontmatter with topic (indicating a topic file)
+            const lines = content.split('\n');
+            if (lines.length < 4 || !lines[0] || !lines[0].startsWith('---')) {
+                continue; // Skip files without frontmatter
+            }
+            // Find the end of frontmatter
+            const frontmatterEnd = lines.findIndex((line, index) => index > 0 && line.startsWith('---'));
+            if (frontmatterEnd === -1) {
+                continue; // Skip files with malformed frontmatter
+            }
+            // Extract frontmatter
+            const frontmatter = lines.slice(1, frontmatterEnd);
+            const body = lines
+                .slice(frontmatterEnd + 1)
+                .join('\n')
+                .trim();
+            // Check if it's a topic file (has topic field in frontmatter)
+            const topicMatch = frontmatter.find((line) => line.startsWith('topic:'));
+            if (!topicMatch) {
+                continue; // Skip non-topic files
+            }
+            // Check if body is empty (only contains whitespace)
+            if (body === '') {
+                // Parse frontmatter to extract metadata
+                const topic = topicMatch.split(':')[1]?.trim().replace(/"/g, '') || '';
+                const promptVersionMatch = frontmatter.find((line) => line.startsWith('prompt_version:'));
+                const timestampMatch = frontmatter.find((line) => line.startsWith('timestamp:'));
+                const prompt_version = promptVersionMatch?.split(':')[1]?.trim().replace(/"/g, '') || '';
+                const timestamp = timestampMatch?.split(':')[1]?.trim().replace(/"/g, '') || '';
+                unfilledFiles.push({
+                    path: filePath,
+                    fileName,
+                    topic,
+                    prompt_version,
+                    timestamp,
+                });
+            }
+        }
+        return ok(unfilledFiles);
+    }
+    catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+            // outputs directory doesn't exist, return empty array
+            return ok([]);
+        }
+        return err(new OutputWriteError(outputsDir, `Failed to scan unfilled files: ${error}`));
+    }
+}
+/**
+ * Update a file by appending content to its body
+ */
+export async function updateFileContent(filePath, content) {
+    // Validate inputs
+    if (!filePath || typeof filePath !== 'string') {
+        return err(new ValidationError('File path', 'a string'));
+    }
+    if (!content || typeof content !== 'string') {
+        return err(new ValidationError('Content', 'a string'));
+    }
+    try {
+        // Read existing file
+        const existingContent = await readFile(filePath, 'utf-8');
+        // Append new content to the file
+        const updatedContent = existingContent + content;
+        // Write updated content back to file
+        await writeFile(filePath, updatedContent, 'utf-8');
+        return ok(filePath);
+    }
+    catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
+            return err(new OutputWriteError(filePath, 'Permission denied. Please check file permissions'));
+        }
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+            return err(new OutputWriteError(filePath, 'File not found. Please check the file path'));
+        }
+        return err(new OutputWriteError(filePath, `Failed to update file: ${error}`));
     }
 }

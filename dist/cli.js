@@ -2,10 +2,11 @@ import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import { Box, Text, useApp } from 'ink';
 import { useCallback, useEffect, useState } from 'react';
 import { ActionList } from './components/ActionList.js';
+import { FileList } from './components/FileList.js';
 import { PromptList } from './components/PromptList.js';
 import { TopicInput } from './components/TopicInput.js';
-import { setClipboardContent } from './utils/clipboard.js';
-import { createTopicFile, normalizeModelName, } from './utils/fileManager.js';
+import { getClipboardContent, setClipboardContent } from './utils/clipboard.js';
+import { createTopicFile, detectUnfilledFiles, normalizeModelName, updateFileContent, } from './utils/fileManager.js';
 import { scanVaultDirectory, validateVaultStructure, } from './utils/promptManager.js';
 import { processTopicTemplate } from './utils/promptProcessor.js';
 import { parsePromptToml } from './utils/tomlParser.js';
@@ -14,6 +15,8 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
     const [prompts, setPrompts] = useState([]);
     const [selectedPrompt, setSelectedPrompt] = useState(null);
     const [, setSelectedAction] = useState(null);
+    const [unfilledFiles, setUnfilledFiles] = useState([]);
+    const [, setSelectedFile] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const { exit } = useApp();
@@ -52,15 +55,27 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
         setSelectedPrompt(prompt);
         setState('action-selecting');
     };
-    const handleActionSelect = (action) => {
+    const handleActionSelect = async (action) => {
         setSelectedAction(action);
         if (action.id === 'create') {
             setState('topic-input');
         }
         else if (action.id === 'fill') {
-            // TODO: Implement fill action
-            setErrorMessage('Fill action not yet implemented');
-            setState('error');
+            if (!selectedPrompt) {
+                setErrorMessage('No prompt selected');
+                setState('error');
+                return;
+            }
+            setState('loading');
+            // Detect unfilled files
+            const unfilledResult = await detectUnfilledFiles(selectedPrompt.path);
+            if (unfilledResult.isErr()) {
+                setErrorMessage(unfilledResult.error.message);
+                setState('error');
+                return;
+            }
+            setUnfilledFiles(unfilledResult.value);
+            setState('file-selecting');
         }
     };
     const handleTopicSubmit = async (topic) => {
@@ -110,13 +125,46 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
             setState('error');
         }
     };
+    const handleFileSelect = async (file) => {
+        setSelectedFile(file);
+        setState('processing');
+        try {
+            // Get content from clipboard
+            const clipboardResult = await getClipboardContent();
+            if (clipboardResult.isErr()) {
+                setErrorMessage(clipboardResult.error.message);
+                setState('error');
+                return;
+            }
+            // Update file with clipboard content
+            const updateResult = await updateFileContent(file.path, clipboardResult.value.content);
+            if (updateResult.isErr()) {
+                setErrorMessage(updateResult.error.message);
+                setState('error');
+                return;
+            }
+            setSuccessMessage(`Successfully filled file: ${file.fileName}\nContent added from clipboard!`);
+            setState('success');
+            setTimeout(() => {
+                exit();
+            }, 3000);
+        }
+        catch (error) {
+            setErrorMessage(`Unexpected error: ${error}`);
+            setState('error');
+        }
+    };
     const handleBackToPromptSelection = () => {
         setSelectedPrompt(null);
         setSelectedAction(null);
+        setUnfilledFiles([]);
+        setSelectedFile(null);
         setState('selecting');
     };
     const handleBackToActionSelection = () => {
         setSelectedAction(null);
+        setUnfilledFiles([]);
+        setSelectedFile(null);
         setState('action-selecting');
     };
     const handleExit = () => {
@@ -143,6 +191,9 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
     }
     if (state === 'topic-input') {
         return (_jsx(TopicInput, { onSubmit: handleTopicSubmit, onCancel: handleBackToActionSelection }));
+    }
+    if (state === 'file-selecting') {
+        return (_jsx(FileList, { files: unfilledFiles, onSelect: handleFileSelect, onExit: handleBackToActionSelection }));
     }
     return (_jsx(PromptList, { prompts: prompts, onSelect: handlePromptSelect, onExit: handleExit }));
 }

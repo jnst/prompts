@@ -10,6 +10,13 @@ export interface TopicFileMetadata {
     prompt_version: string;
     timestamp: string;
 }
+export interface UnfilledFile {
+    path: string;
+    fileName: string;
+    topic: string;
+    prompt_version: string;
+    timestamp: string;
+}
 export declare function generateFrontmatter(metadata: OutputMetadata): string;
 export declare function generateTopicFrontmatter(metadata: TopicFileMetadata): string;
 export declare function generateTimestamp(): string;
@@ -22,3 +29,12 @@ export declare function normalizeModelName(model: string): string;
  * Generates a file with frontmatter but empty body for user to fill
  */
 export declare function createTopicFile(promptPath: string, topic: string, promptVersion: string): Promise<Result<string, ValidationError | OutputWriteError>>;
+/**
+ * Detect unfilled files in the outputs directory
+ * Returns files that have frontmatter but empty body
+ */
+export declare function detectUnfilledFiles(promptPath: string): Promise<Result<UnfilledFile[], ValidationError | OutputWriteError>>;
+/**
+ * Update a file by appending content to its body
+ */
+export declare function updateFileContent(filePath: string, content: string): Promise<Result<string, ValidationError | OutputWriteError>>;

@@ -1,12 +1,16 @@
 import { Box, Text, useApp } from 'ink';
 import { useCallback, useEffect, useState } from 'react';
 import { type ActionInfo, ActionList } from './components/ActionList.js';
+import { FileList } from './components/FileList.js';
 import { PromptList } from './components/PromptList.js';
 import { TopicInput } from './components/TopicInput.js';
-import { setClipboardContent } from './utils/clipboard.js';
+import { getClipboardContent, setClipboardContent } from './utils/clipboard.js';
 import {
 	createTopicFile,
+	detectUnfilledFiles,
 	normalizeModelName,
+	type UnfilledFile,
+	updateFileContent,
 } from './utils/fileManager.js';
 import type { PromptInfo } from './utils/promptManager.js';
 import {
@@ -21,6 +25,7 @@ type AppState =
 	| 'selecting'
 	| 'action-selecting'
 	| 'topic-input'
+	| 'file-selecting'
 	| 'processing'
 	| 'success'
 	| 'error';
@@ -38,6 +43,8 @@ export function Cli({
 	const [prompts, setPrompts] = useState<PromptInfo[]>([]);
 	const [selectedPrompt, setSelectedPrompt] = useState<PromptInfo | null>(null);
 	const [, setSelectedAction] = useState<ActionInfo | null>(null);
+	const [unfilledFiles, setUnfilledFiles] = useState<UnfilledFile[]>([]);
+	const [, setSelectedFile] = useState<UnfilledFile | null>(null);
 	const [errorMessage, setErrorMessage] = useState<string>('');
 	const [successMessage, setSuccessMessage] = useState<string>('');
 	const { exit } = useApp();
@@ -88,15 +95,30 @@ export function Cli({
 		setState('action-selecting');
 	};
 
-	const handleActionSelect = (action: ActionInfo) => {
+	const handleActionSelect = async (action: ActionInfo) => {
 		setSelectedAction(action);
 
 		if (action.id === 'create') {
 			setState('topic-input');
 		} else if (action.id === 'fill') {
-			// TODO: Implement fill action
-			setErrorMessage('Fill action not yet implemented');
-			setState('error');
+			if (!selectedPrompt) {
+				setErrorMessage('No prompt selected');
+				setState('error');
+				return;
+			}
+
+			setState('loading');
+
+			// Detect unfilled files
+			const unfilledResult = await detectUnfilledFiles(selectedPrompt.path);
+			if (unfilledResult.isErr()) {
+				setErrorMessage(unfilledResult.error.message);
+				setState('error');
+				return;
+			}
+
+			setUnfilledFiles(unfilledResult.value);
+			setState('file-selecting');
 		}
 	};
 
@@ -165,15 +187,56 @@ export function Cli({
 		}
 	};
 
+	const handleFileSelect = async (file: UnfilledFile) => {
+		setSelectedFile(file);
+		setState('processing');
+
+		try {
+			// Get content from clipboard
+			const clipboardResult = await getClipboardContent();
+			if (clipboardResult.isErr()) {
+				setErrorMessage(clipboardResult.error.message);
+				setState('error');
+				return;
+			}
+
+			// Update file with clipboard content
+			const updateResult = await updateFileContent(
+				file.path,
+				clipboardResult.value.content,
+			);
+			if (updateResult.isErr()) {
+				setErrorMessage(updateResult.error.message);
+				setState('error');
+				return;
+			}
+
+			setSuccessMessage(
+				`Successfully filled file: ${file.fileName}\nContent added from clipboard!`,
+			);
+			setState('success');
+
+			setTimeout(() => {
+				exit();
+			}, 3000);
+		} catch (error) {
+			setErrorMessage(`Unexpected error: ${error}`);
+			setState('error');
+		}
+	};
 
 	const handleBackToPromptSelection = () => {
 		setSelectedPrompt(null);
 		setSelectedAction(null);
+		setUnfilledFiles([]);
+		setSelectedFile(null);
 		setState('selecting');
 	};
 
 	const handleBackToActionSelection = () => {
 		setSelectedAction(null);
+		setUnfilledFiles([]);
+		setSelectedFile(null);
 		setState('action-selecting');
 	};
 
@@ -246,6 +309,16 @@ export function Cli({
 			<TopicInput
 				onSubmit={handleTopicSubmit}
 				onCancel={handleBackToActionSelection}
+			/>
+		);
+	}
+
+	if (state === 'file-selecting') {
+		return (
+			<FileList
+				files={unfilledFiles}
+				onSelect={handleFileSelect}
+				onExit={handleBackToActionSelection}
 			/>
 		);
 	}
