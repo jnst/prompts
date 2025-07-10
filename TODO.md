@@ -181,16 +181,16 @@
     - [x] 置換済みプロンプトを `pbcopy` でクリップボードにコピー
     - [x] 既存clipboard.ts の出力機能を活用
 
-- [ ] `fill` アクション実装  
-  - [ ] 回答が未記入なファイルの検出機能
-    - [ ] front matter があり、本体が空のファイルをスキャン
-    - [ ] `outputs/` ディレクトリ内の対象ファイル一覧表示
-  - [ ] インタラクティブファイル選択UI
-    - [ ] 矢印キーでファイル選択
-    - [ ] ファイル名とtopic表示
-  - [ ] クリップボードから回答内容取得
-    - [ ] 既存clipboard.ts機能を再利用
-    - [ ] 選択ファイルの本体部分に追記
+- [x] `fill` アクション実装  
+  - [x] 回答が未記入なファイルの検出機能
+    - [x] front matter があり、本体が空のファイルをスキャン
+    - [x] `outputs/` ディレクトリ内の対象ファイル一覧表示
+  - [x] インタラクティブファイル選択UI
+    - [x] 矢印キーでファイル選択
+    - [x] ファイル名とtopic表示
+  - [x] クリップボードから回答内容取得
+    - [x] 既存clipboard.ts機能を再利用
+    - [x] 選択ファイルの本体部分に追記
 
 ### 8.2 CLI インターフェース拡張 ✅
 - [x] アクション選択機能
@@ -202,8 +202,8 @@
   - [x] `src/utils/fileManager.ts` 拡張
   - [x] トピック指定ファイル生成機能 (`createTopicFile`)
   - [x] トピック専用frontmatter生成機能
-  - [ ] 未記入ファイル検出機能
-  - [ ] ファイル内容更新機能（追記モード）
+  - [x] 未記入ファイル検出機能
+  - [x] ファイル内容更新機能（追記モード）
 
 - [x] プロンプト置換機能実装
   - [x] `src/utils/promptProcessor.ts` 作成
@@ -222,18 +222,18 @@
   - [x] バリデーション機能
   - [x] キャンセル機能
 
-- [ ] `src/components/FileList.tsx` 作成
-  - [ ] 未記入ファイル一覧表示
-  - [ ] topic名とファイル名表示
-  - [ ] インタラクティブ選択機能
+- [x] `src/components/FileList.tsx` 作成
+  - [x] 未記入ファイル一覧表示
+  - [x] topic名とファイル名表示
+  - [x] インタラクティブ選択機能
 
 ### 8.4 テスト実装
-- [ ] `src/utils/promptProcessor.test.ts`
-- [ ] `src/components/ActionList.test.ts`
-- [ ] `src/components/TopicInput.test.ts`
-- [ ] `src/components/FileList.test.ts` 
-- [ ] 拡張されたfileManager機能のテスト
-- [ ] アクション統合テスト
+- [x] `src/utils/promptProcessor.test.ts`
+- [x] `src/components/ActionList.test.ts`
+- [x] `src/components/TopicInput.test.ts`
+- [x] `src/components/FileList.test.ts` 
+- [x] 拡張されたfileManager機能のテスト
+- [x] アクション統合テスト
 
 ## 9. 実装優先度
 
