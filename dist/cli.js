@@ -6,7 +6,7 @@ import { FileList } from './components/FileList.js';
 import { PromptList } from './components/PromptList.js';
 import { TopicInput } from './components/TopicInput.js';
 import { getClipboardContent, setClipboardContent } from './utils/clipboard.js';
-import { createTopicFile, detectUnfilledFiles, normalizeModelName, updateFileContent, } from './utils/fileManager.js';
+import { clearFileContent, createTopicFile, detectAllOutputFiles, detectUnfilledFiles, normalizeModelName, removeFile, updateFileContent, } from './utils/fileManager.js';
 import { scanVaultDirectory, validateVaultStructure, } from './utils/promptManager.js';
 import { processTopicTemplate } from './utils/promptProcessor.js';
 import { parsePromptToml } from './utils/tomlParser.js';
@@ -14,8 +14,9 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
     const [state, setState] = useState('loading');
     const [prompts, setPrompts] = useState([]);
     const [selectedPrompt, setSelectedPrompt] = useState(null);
-    const [, setSelectedAction] = useState(null);
+    const [selectedAction, setSelectedAction] = useState(null);
     const [unfilledFiles, setUnfilledFiles] = useState([]);
+    const [outputFiles, setOutputFiles] = useState([]);
     const [, setSelectedFile] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
@@ -77,6 +78,32 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
             setUnfilledFiles(unfilledResult.value);
             setState('file-selecting');
         }
+        else if (action.id === 'clear' || action.id === 'remove') {
+            if (!selectedPrompt) {
+                setErrorMessage('No prompt selected');
+                setState('error');
+                return;
+            }
+            setState('loading');
+            // Detect all output files for clear/remove actions
+            const outputResult = await detectAllOutputFiles(selectedPrompt.path);
+            if (outputResult.isErr()) {
+                setErrorMessage(outputResult.error.message);
+                setState('error');
+                return;
+            }
+            // Filter files based on action
+            if (action.id === 'clear') {
+                // For clear: only files with content
+                const filesWithContent = outputResult.value.filter((file) => file.hasContent);
+                setOutputFiles(filesWithContent);
+            }
+            else {
+                // For remove: all files
+                setOutputFiles(outputResult.value);
+            }
+            setState('file-selecting');
+        }
     };
     const handleTopicSubmit = async (topic) => {
         if (!selectedPrompt) {
@@ -129,21 +156,43 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
         setSelectedFile(file);
         setState('processing');
         try {
-            // Get content from clipboard
-            const clipboardResult = await getClipboardContent();
-            if (clipboardResult.isErr()) {
-                setErrorMessage(clipboardResult.error.message);
-                setState('error');
-                return;
+            if (selectedAction?.id === 'fill') {
+                // Get content from clipboard
+                const clipboardResult = await getClipboardContent();
+                if (clipboardResult.isErr()) {
+                    setErrorMessage(clipboardResult.error.message);
+                    setState('error');
+                    return;
+                }
+                // Update file with clipboard content
+                const updateResult = await updateFileContent(file.path, clipboardResult.value.content);
+                if (updateResult.isErr()) {
+                    setErrorMessage(updateResult.error.message);
+                    setState('error');
+                    return;
+                }
+                setSuccessMessage(`Successfully filled file: ${file.fileName}\nContent added from clipboard!`);
             }
-            // Update file with clipboard content
-            const updateResult = await updateFileContent(file.path, clipboardResult.value.content);
-            if (updateResult.isErr()) {
-                setErrorMessage(updateResult.error.message);
-                setState('error');
-                return;
+            else if (selectedAction?.id === 'clear') {
+                // Clear file content while preserving frontmatter
+                const clearResult = await clearFileContent(file.path);
+                if (clearResult.isErr()) {
+                    setErrorMessage(clearResult.error.message);
+                    setState('error');
+                    return;
+                }
+                setSuccessMessage(`Successfully cleared file: ${file.fileName}\nFrontmatter preserved, content removed!`);
             }
-            setSuccessMessage(`Successfully filled file: ${file.fileName}\nContent added from clipboard!`);
+            else if (selectedAction?.id === 'remove') {
+                // Remove file completely
+                const removeResult = await removeFile(file.path);
+                if (removeResult.isErr()) {
+                    setErrorMessage(removeResult.error.message);
+                    setState('error');
+                    return;
+                }
+                setSuccessMessage(`Successfully removed file: ${file.fileName}\nFile deleted completely!`);
+            }
             setState('success');
             setTimeout(() => {
                 exit();
@@ -158,12 +207,14 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
         setSelectedPrompt(null);
         setSelectedAction(null);
         setUnfilledFiles([]);
+        setOutputFiles([]);
         setSelectedFile(null);
         setState('selecting');
     };
     const handleBackToActionSelection = () => {
         setSelectedAction(null);
         setUnfilledFiles([]);
+        setOutputFiles([]);
         setSelectedFile(null);
         setState('action-selecting');
     };
@@ -186,6 +237,12 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
         const actions = [
             { id: 'create', name: 'create', description: 'Create new topic file' },
             { id: 'fill', name: 'fill', description: 'Fill existing empty file' },
+            {
+                id: 'clear',
+                name: 'clear',
+                description: 'Clear file content (keep frontmatter)',
+            },
+            { id: 'remove', name: 'remove', description: 'Remove file completely' },
         ];
         return (_jsx(ActionList, { actions: actions, onSelect: handleActionSelect, onExit: handleBackToPromptSelection }));
     }
@@ -193,7 +250,16 @@ export function Cli({ model = 'claude-sonnet-4', vaultPath = 'vault', }) {
         return (_jsx(TopicInput, { onSubmit: handleTopicSubmit, onCancel: handleBackToActionSelection }));
     }
     if (state === 'file-selecting') {
-        return (_jsx(FileList, { files: unfilledFiles, onSelect: handleFileSelect, onExit: handleBackToActionSelection }));
+        // Choose the appropriate file list based on selected action
+        let files = [];
+        if (selectedAction?.id === 'fill') {
+            files = unfilledFiles;
+        }
+        else if (selectedAction?.id === 'clear' ||
+            selectedAction?.id === 'remove') {
+            files = outputFiles;
+        }
+        return (_jsx(FileList, { files: files, onSelect: handleFileSelect, onExit: handleBackToActionSelection }));
     }
     return (_jsx(PromptList, { prompts: prompts, onSelect: handlePromptSelect, onExit: handleExit }));
 }

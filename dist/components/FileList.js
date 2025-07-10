@@ -28,5 +28,9 @@ export function FileList({ files, onSelect, onExit }) {
     if (files.length === 0) {
         return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { bold: true, children: "No unfilled files found" }), _jsx(Text, { dimColor: true, children: "Create some topic files first using the 'create' action" }), _jsx(Box, { marginTop: 1, children: _jsx(Text, { dimColor: true, children: "Press ESC or 'q' to go back" }) })] }));
     }
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { bold: true, children: "Select a file to fill:" }), _jsx(Box, { marginTop: 1, flexDirection: "column", children: files.map((file, index) => (_jsx(Box, { children: _jsxs(Text, { ...(index === selectedIndex ? { color: 'cyan' } : {}), children: [index === selectedIndex ? '➤ ' : '  ', file.topic, " (", file.fileName, ")"] }) }, file.path))) }), _jsx(Box, { marginTop: 1, children: _jsx(Text, { dimColor: true, children: "Use \u2191/\u2193 arrows to navigate, Enter to select, ESC/q to exit" }) })] }));
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { bold: true, children: "Select a file to fill:" }), _jsx(Box, { marginTop: 1, flexDirection: "column", children: files.map((file, index) => (_jsx(Box, { children: _jsxs(Text, { ...(index === selectedIndex ? { color: 'cyan' } : {}), children: [index === selectedIndex ? '➤ ' : '  ', 'topic' in file
+                                ? `${file.topic} (${file.fileName})`
+                                : 'metadata' in file && file.metadata?.topic
+                                    ? `${file.metadata.topic} (${file.fileName})`
+                                    : file.fileName] }) }, file.path))) }), _jsx(Box, { marginTop: 1, children: _jsx(Text, { dimColor: true, children: "Use \u2191/\u2193 arrows to navigate, Enter to select, ESC/q to exit" }) })] }));
 }

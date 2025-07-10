@@ -1,10 +1,12 @@
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useState } from 'react';
-import type { UnfilledFile } from '../utils/fileManager.js';
+import type { OutputFile, UnfilledFile } from '../utils/fileManager.js';
+
+type FileType = UnfilledFile | OutputFile;
 
 export interface FileListProps {
-	files: UnfilledFile[];
-	onSelect: (file: UnfilledFile) => void;
+	files: FileType[];
+	onSelect: (file: FileType) => void;
 	onExit: () => void;
 }
 
@@ -48,13 +50,17 @@ export function FileList({ files, onSelect, onExit }: FileListProps) {
 
 	return (
 		<Box flexDirection="column">
-			<Text bold>Select a file to fill:</Text>
+			<Text bold>Select a file:</Text>
 			<Box marginTop={1} flexDirection="column">
 				{files.map((file, index) => (
 					<Box key={file.path}>
 						<Text {...(index === selectedIndex ? { color: 'cyan' } : {})}>
 							{index === selectedIndex ? '➤ ' : '  '}
-							{file.topic} ({file.fileName})
+							{'topic' in file
+								? `${file.topic} (${file.fileName})`
+								: 'metadata' in file && file.metadata?.topic
+									? `${file.metadata.topic} (${file.fileName})`
+									: file.fileName}
 						</Text>
 					</Box>
 				))}

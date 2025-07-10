@@ -2,9 +2,12 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+	clearFileContent,
 	createTopicFile,
+	detectFilledFiles,
 	detectUnfilledFiles,
 	normalizeModelName,
+	removeFile,
 	saveOutput,
 	updateFileContent,
 } from './fileManager.js';
@@ -425,6 +428,189 @@ Line 4 after empty line`;
 		it('should return error for non-existent file', async () => {
 			const nonExistentFile = path.join(TEST_OUTPUTS_PATH, 'does-not-exist.md');
 			const result = await updateFileContent(nonExistentFile, 'some content');
+
+			expect(result.isErr()).toBe(true);
+			if (result.isOk()) return; // Type guard
+
+			expect(result.error.message).toContain('File not found');
+		});
+	});
+
+	describe('detectFilledFiles', () => {
+		it('should detect files with content', async () => {
+			// Create filled topic file
+			const filledFilePath = path.join(TEST_OUTPUTS_PATH, 'filled-topic.md');
+			await fs.writeFile(
+				filledFilePath,
+				`---
+topic: "filled-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+This file has content and should be detected as filled.
+`,
+			);
+
+			// Create empty topic file
+			const emptyFilePath = path.join(TEST_OUTPUTS_PATH, 'empty-topic.md');
+			await fs.writeFile(
+				emptyFilePath,
+				`---
+topic: "empty-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+`,
+			);
+
+			const result = await detectFilledFiles(TEST_PROMPT_PATH);
+
+			// Should detect only the filled file
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const filledFiles = result.value;
+			expect(filledFiles).toHaveLength(1);
+			expect(filledFiles[0].topic).toBe('filled-topic');
+			expect(filledFiles[0].fileName).toBe('filled-topic.md');
+		});
+
+		it('should return empty array when no filled files exist', async () => {
+			// Create only empty files
+			const emptyFilePath = path.join(TEST_OUTPUTS_PATH, 'empty-topic.md');
+			await fs.writeFile(
+				emptyFilePath,
+				`---
+topic: "empty-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+`,
+			);
+
+			const result = await detectFilledFiles(TEST_PROMPT_PATH);
+
+			// Should return empty array
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const filledFiles = result.value;
+			expect(filledFiles).toHaveLength(0);
+		});
+
+		it('should return empty array when outputs directory does not exist', async () => {
+			// Remove outputs directory
+			await fs.rm(TEST_OUTPUTS_PATH, { recursive: true, force: true });
+
+			const result = await detectFilledFiles(TEST_PROMPT_PATH);
+
+			// Should return empty array without error
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const filledFiles = result.value;
+			expect(filledFiles).toHaveLength(0);
+		});
+	});
+
+	describe('clearFileContent', () => {
+		it('should clear content while preserving frontmatter', async () => {
+			// Create test file with content
+			const testFilePath = path.join(TEST_OUTPUTS_PATH, 'test-clear.md');
+			const originalContent = `---
+topic: "test-topic"
+prompt_version: "1.0.0"
+timestamp: "2024-01-15T10:30:00Z"
+---
+
+This is some content that should be cleared.
+
+Multiple lines of content here.
+`;
+			await fs.writeFile(testFilePath, originalContent);
+
+			// Clear the file
+			const result = await clearFileContent(testFilePath);
+
+			// Check that clear was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			const clearedContent = await fs.readFile(testFilePath, 'utf-8');
+
+			// Should contain frontmatter
+			expect(clearedContent).toContain('---');
+			expect(clearedContent).toContain('topic: "test-topic"');
+			expect(clearedContent).toContain('prompt_version: "1.0.0"');
+			expect(clearedContent).toContain('timestamp: "2024-01-15T10:30:00Z"');
+			expect(clearedContent).toContain('---');
+
+			// Should not contain the original content
+			expect(clearedContent).not.toContain('This is some content');
+			expect(clearedContent).not.toContain('Multiple lines');
+
+			// Should have empty body
+			const lines = clearedContent.split('\n');
+			const frontmatterEnd = lines.findIndex(
+				(line, index) => index > 0 && line.startsWith('---'),
+			);
+			const body = lines
+				.slice(frontmatterEnd + 1)
+				.join('\n')
+				.trim();
+			expect(body).toBe('');
+		});
+
+		it('should return error for file without frontmatter', async () => {
+			// Create test file without frontmatter
+			const testFilePath = path.join(TEST_OUTPUTS_PATH, 'no-frontmatter.md');
+			await fs.writeFile(testFilePath, 'Just some content without frontmatter');
+
+			const result = await clearFileContent(testFilePath);
+
+			expect(result.isErr()).toBe(true);
+			if (result.isOk()) return; // Type guard
+
+			expect(result.error.message).toContain('File format');
+		});
+
+		it('should return error for non-existent file', async () => {
+			const nonExistentFile = path.join(TEST_OUTPUTS_PATH, 'does-not-exist.md');
+			const result = await clearFileContent(nonExistentFile);
+
+			expect(result.isErr()).toBe(true);
+			if (result.isOk()) return; // Type guard
+
+			expect(result.error.message).toContain('File not found');
+		});
+	});
+
+	describe('removeFile', () => {
+		it('should remove file completely', async () => {
+			// Create test file
+			const testFilePath = path.join(TEST_OUTPUTS_PATH, 'test-remove.md');
+			await fs.writeFile(testFilePath, 'This file will be removed');
+
+			// Verify file exists
+			await expect(fs.access(testFilePath)).resolves.not.toThrow();
+
+			// Remove the file
+			const result = await removeFile(testFilePath);
+
+			// Check that removal was successful
+			expect(result.isOk()).toBe(true);
+			if (result.isErr()) return; // Type guard
+
+			// Verify file no longer exists
+			await expect(fs.access(testFilePath)).rejects.toThrow();
+		});
+
+		it('should return error for non-existent file', async () => {
+			const nonExistentFile = path.join(TEST_OUTPUTS_PATH, 'does-not-exist.md');
+			const result = await removeFile(nonExistentFile);
 
 			expect(result.isErr()).toBe(true);
 			if (result.isOk()) return; // Type guard

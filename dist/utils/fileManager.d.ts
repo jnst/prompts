@@ -17,6 +17,24 @@ export interface UnfilledFile {
     prompt_version: string;
     timestamp: string;
 }
+export interface FilledFile {
+    path: string;
+    fileName: string;
+    topic: string;
+    prompt_version: string;
+    timestamp: string;
+}
+export interface OutputFile {
+    path: string;
+    fileName: string;
+    hasContent: boolean;
+    type: 'topic' | 'other';
+    metadata?: {
+        topic?: string;
+        prompt_version?: string;
+        timestamp?: string;
+    } | undefined;
+}
 export declare function generateFrontmatter(metadata: OutputMetadata): string;
 export declare function generateTopicFrontmatter(metadata: TopicFileMetadata): string;
 export declare function generateTimestamp(): string;
@@ -38,3 +56,21 @@ export declare function detectUnfilledFiles(promptPath: string): Promise<Result<
  * Update a file by appending content to its body
  */
 export declare function updateFileContent(filePath: string, content: string): Promise<Result<string, ValidationError | OutputWriteError>>;
+/**
+ * Detect all output files in the outputs directory
+ * Returns all .md files with their content status
+ */
+export declare function detectAllOutputFiles(promptPath: string): Promise<Result<OutputFile[], ValidationError | OutputWriteError>>;
+/**
+ * Detect filled files in the outputs directory
+ * Returns files that have frontmatter and non-empty body
+ */
+export declare function detectFilledFiles(promptPath: string): Promise<Result<FilledFile[], ValidationError | OutputWriteError>>;
+/**
+ * Clear file content while preserving frontmatter (if exists)
+ */
+export declare function clearFileContent(filePath: string): Promise<Result<string, ValidationError | OutputWriteError>>;
+/**
+ * Remove file completely
+ */
+export declare function removeFile(filePath: string): Promise<Result<string, ValidationError | OutputWriteError>>;

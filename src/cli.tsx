@@ -6,9 +6,13 @@ import { PromptList } from './components/PromptList.js';
 import { TopicInput } from './components/TopicInput.js';
 import { getClipboardContent, setClipboardContent } from './utils/clipboard.js';
 import {
+	clearFileContent,
 	createTopicFile,
+	detectAllOutputFiles,
 	detectUnfilledFiles,
 	normalizeModelName,
+	type OutputFile,
+	removeFile,
 	type UnfilledFile,
 	updateFileContent,
 } from './utils/fileManager.js';
@@ -42,9 +46,10 @@ export function Cli({
 	const [state, setState] = useState<AppState>('loading');
 	const [prompts, setPrompts] = useState<PromptInfo[]>([]);
 	const [selectedPrompt, setSelectedPrompt] = useState<PromptInfo | null>(null);
-	const [, setSelectedAction] = useState<ActionInfo | null>(null);
+	const [selectedAction, setSelectedAction] = useState<ActionInfo | null>(null);
 	const [unfilledFiles, setUnfilledFiles] = useState<UnfilledFile[]>([]);
-	const [, setSelectedFile] = useState<UnfilledFile | null>(null);
+	const [outputFiles, setOutputFiles] = useState<OutputFile[]>([]);
+	const [, setSelectedFile] = useState<UnfilledFile | OutputFile | null>(null);
 	const [errorMessage, setErrorMessage] = useState<string>('');
 	const [successMessage, setSuccessMessage] = useState<string>('');
 	const { exit } = useApp();
@@ -119,6 +124,36 @@ export function Cli({
 
 			setUnfilledFiles(unfilledResult.value);
 			setState('file-selecting');
+		} else if (action.id === 'reset' || action.id === 'delete') {
+			if (!selectedPrompt) {
+				setErrorMessage('No prompt selected');
+				setState('error');
+				return;
+			}
+
+			setState('loading');
+
+			// Detect all output files for clear/remove actions
+			const outputResult = await detectAllOutputFiles(selectedPrompt.path);
+			if (outputResult.isErr()) {
+				setErrorMessage(outputResult.error.message);
+				setState('error');
+				return;
+			}
+
+			// Filter files based on action
+			if (action.id === 'reset') {
+				// For reset: only files with content
+				const filesWithContent = outputResult.value.filter(
+					(file) => file.hasContent,
+				);
+				setOutputFiles(filesWithContent);
+			} else {
+				// For delete: all files
+				setOutputFiles(outputResult.value);
+			}
+
+			setState('file-selecting');
 		}
 	};
 
@@ -187,33 +222,60 @@ export function Cli({
 		}
 	};
 
-	const handleFileSelect = async (file: UnfilledFile) => {
+	const handleFileSelect = async (file: UnfilledFile | OutputFile) => {
 		setSelectedFile(file);
 		setState('processing');
 
 		try {
-			// Get content from clipboard
-			const clipboardResult = await getClipboardContent();
-			if (clipboardResult.isErr()) {
-				setErrorMessage(clipboardResult.error.message);
-				setState('error');
-				return;
+			if (selectedAction?.id === 'fill') {
+				// Get content from clipboard
+				const clipboardResult = await getClipboardContent();
+				if (clipboardResult.isErr()) {
+					setErrorMessage(clipboardResult.error.message);
+					setState('error');
+					return;
+				}
+
+				// Update file with clipboard content
+				const updateResult = await updateFileContent(
+					file.path,
+					clipboardResult.value.content,
+				);
+				if (updateResult.isErr()) {
+					setErrorMessage(updateResult.error.message);
+					setState('error');
+					return;
+				}
+
+				setSuccessMessage(
+					`Successfully filled file: ${file.fileName}\nContent added from clipboard!`,
+				);
+			} else if (selectedAction?.id === 'reset') {
+				// Reset file content while preserving frontmatter
+				const resetResult = await clearFileContent(file.path);
+				if (resetResult.isErr()) {
+					setErrorMessage(resetResult.error.message);
+					setState('error');
+					return;
+				}
+
+				setSuccessMessage(
+					`Successfully reset file: ${file.fileName}\nFrontmatter preserved, content removed!`,
+				);
+			} else if (selectedAction?.id === 'delete') {
+				// Delete file completely
+				const deleteResult = await removeFile(file.path);
+				if (deleteResult.isErr()) {
+					setErrorMessage(deleteResult.error.message);
+					setState('error');
+					return;
+				}
+
+				setSuccessMessage(
+					`Successfully deleted file: ${file.fileName}\nFile deleted completely!`,
+				);
 			}
 
-			// Update file with clipboard content
-			const updateResult = await updateFileContent(
-				file.path,
-				clipboardResult.value.content,
-			);
-			if (updateResult.isErr()) {
-				setErrorMessage(updateResult.error.message);
-				setState('error');
-				return;
-			}
-
-			setSuccessMessage(
-				`Successfully filled file: ${file.fileName}\nContent added from clipboard!`,
-			);
 			setState('success');
 
 			setTimeout(() => {
@@ -229,6 +291,7 @@ export function Cli({
 		setSelectedPrompt(null);
 		setSelectedAction(null);
 		setUnfilledFiles([]);
+		setOutputFiles([]);
 		setSelectedFile(null);
 		setState('selecting');
 	};
@@ -236,6 +299,7 @@ export function Cli({
 	const handleBackToActionSelection = () => {
 		setSelectedAction(null);
 		setUnfilledFiles([]);
+		setOutputFiles([]);
 		setSelectedFile(null);
 		setState('action-selecting');
 	};
@@ -293,6 +357,12 @@ export function Cli({
 		const actions: ActionInfo[] = [
 			{ id: 'create', name: 'create', description: 'Create new topic file' },
 			{ id: 'fill', name: 'fill', description: 'Fill existing empty file' },
+			{
+				id: 'reset',
+				name: 'reset',
+				description: 'Reset file to empty state (keep frontmatter)',
+			},
+			{ id: 'delete', name: 'delete', description: 'Delete file completely' },
 		];
 
 		return (
@@ -314,9 +384,21 @@ export function Cli({
 	}
 
 	if (state === 'file-selecting') {
+		// Choose the appropriate file list based on selected action
+		let files: (UnfilledFile | OutputFile)[] = [];
+
+		if (selectedAction?.id === 'fill') {
+			files = unfilledFiles;
+		} else if (
+			selectedAction?.id === 'reset' ||
+			selectedAction?.id === 'delete'
+		) {
+			files = outputFiles;
+		}
+
 		return (
 			<FileList
-				files={unfilledFiles}
+				files={files}
 				onSelect={handleFileSelect}
 				onExit={handleBackToActionSelection}
 			/>

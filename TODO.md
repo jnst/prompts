@@ -249,3 +249,43 @@
 - [x] エラーハンドリング強化
 - [x] 使用方法ドキュメント更新
 - [x] FileList選択バグ修正（3番目のアイテムが選択できない問題）
+
+## 10. ファイル管理機能拡張 ✅
+
+### 10.1 新アクション実装 ✅
+- [x] `reset` アクション実装（旧 clear）
+  - [x] ファイル内容をクリアしつつfrontmatterを保持
+  - [x] 全.mdファイル対象（topic形式以外も含む）
+  - [x] 内容がある場合のみ選択肢に表示
+  - [x] clearFileContent()関数で実装
+
+- [x] `delete` アクション実装（旧 remove）
+  - [x] ファイルを完全削除
+  - [x] 全.mdファイル対象（topic形式以外も含む）
+  - [x] removeFile()関数で実装
+  - [x] すべてのファイルを選択肢に表示
+
+### 10.2 ファイル検出機能強化 ✅
+- [x] `detectAllOutputFiles()` 関数実装
+  - [x] outputsディレクトリ内の全.mdファイルを検出
+  - [x] topic形式以外のファイルも含める
+  - [x] ファイル内容の有無を判定
+  - [x] OutputFile型で統一的に管理
+
+### 10.3 UI/UX改善 ✅
+- [x] FileList汎用化
+  - [x] UnfilledFile | OutputFile の union type対応
+  - [x] "Select a file:" への汎用的なメッセージ変更
+  - [x] 異なるファイル形式での適切な表示
+
+### 10.4 テスト実装 ✅
+- [x] detectAllOutputFiles()のテスト
+- [x] clearFileContent()のテスト
+- [x] removeFile()のテスト
+- [x] 型安全性のテスト
+
+**Phase 6 (ファイル管理機能): ✅ 完了**
+- [x] reset/delete アクション実装
+- [x] 全ファイル形式対応
+- [x] アクション名改善（clear→reset, remove→delete）
+- [x] エラーハンドリング強化
