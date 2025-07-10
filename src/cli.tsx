@@ -3,11 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { type ActionInfo, ActionList } from './components/ActionList.js';
 import { PromptList } from './components/PromptList.js';
 import { TopicInput } from './components/TopicInput.js';
-import { getClipboardContent, setClipboardContent } from './utils/clipboard.js';
+import { setClipboardContent } from './utils/clipboard.js';
 import {
 	createTopicFile,
 	normalizeModelName,
-	saveOutput,
 } from './utils/fileManager.js';
 import type { PromptInfo } from './utils/promptManager.js';
 import {
@@ -98,9 +97,6 @@ export function Cli({
 			// TODO: Implement fill action
 			setErrorMessage('Fill action not yet implemented');
 			setState('error');
-		} else if (action.id === 'generate') {
-			// Original flow - clipboard to timestamped file
-			handleGenerateAction();
 		}
 	};
 
@@ -169,54 +165,6 @@ export function Cli({
 		}
 	};
 
-	const handleGenerateAction = async () => {
-		if (!selectedPrompt) return;
-
-		setState('processing');
-
-		// Parse the prompt template
-		const promptResult = await parsePromptToml(selectedPrompt.path);
-		if (promptResult.isErr()) {
-			setErrorMessage(promptResult.error.message);
-			setState('error');
-			return;
-		}
-
-		// Get clipboard content
-		const clipboardResult = await getClipboardContent();
-		if (clipboardResult.isErr()) {
-			setErrorMessage(clipboardResult.error.message);
-			setState('error');
-			return;
-		}
-
-		// Handle warnings
-		const { content, warnings } = clipboardResult.value;
-		warnings.forEach((warning) => {
-			console.warn(warning.message);
-		});
-
-		// Save the output
-		const outputResult = await saveOutput(selectedPrompt.path, content, {
-			version: promptResult.value.version,
-			model: normalizedModel,
-			timestamp: '', // Will be generated in saveOutput
-		});
-
-		if (outputResult.isErr()) {
-			setErrorMessage(outputResult.error.message);
-			setState('error');
-			return;
-		}
-
-		setSuccessMessage(`Output saved to: ${outputResult.value}`);
-		setState('success');
-
-		// Auto-exit after 2 seconds
-		setTimeout(() => {
-			exit();
-		}, 2000);
-	};
 
 	const handleBackToPromptSelection = () => {
 		setSelectedPrompt(null);
@@ -282,11 +230,6 @@ export function Cli({
 		const actions: ActionInfo[] = [
 			{ id: 'create', name: 'create', description: 'Create new topic file' },
 			{ id: 'fill', name: 'fill', description: 'Fill existing empty file' },
-			{
-				id: 'generate',
-				name: 'generate',
-				description: 'Generate from clipboard (original)',
-			},
 		];
 
 		return (
