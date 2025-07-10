@@ -1,4 +1,7 @@
 ---
+topic: "Transformerアーキテクチャ"
+prompt_version: "1.0.0"
+timestamp: "2025-06-29T00:00:00"
 ---
 
 Transformerアーキテクチャを **「翻訳者の会議室」** として理解しましょう。

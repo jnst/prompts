@@ -1,7 +1,7 @@
 [metadata]
 current_version = "1.0.0"
-created_at = "2025-07-07T00:00:00Z"
-updated_at = "2025-07-07T00:00:00Z"
+created_at = "2025-06-20T00:00:00Z"
+updated_at = "2025-06-20T00:00:00Z"
 
 [[prompts]]
 version = "1.0.0"
@@ -12,4 +12,4 @@ content = """
 - 他の知識との関連付けができる
 - 「なぜ？」という問いに答えられる
 """
-created_at = "2025-07-07T00:00:00Z"
+created_at = "2025-06-20T00:00:00Z"

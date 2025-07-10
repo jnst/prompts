@@ -1,4 +1,7 @@
 ---
+topic: "Kubernetes"
+prompt_version: "1.0.0"
+timestamp: "2025-06-29T00:00:00"
 ---
 
 Kubernetesを **「賢い港の管理システム」** として理解しましょう。
