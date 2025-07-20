@@ -105,7 +105,7 @@ export function Cli({
 
 		if (action.id === 'create') {
 			setState('topic-input');
-		} else if (action.id === 'fill') {
+		} else if (action.id === 'fill' || action.id === 'select') {
 			if (!selectedPrompt) {
 				setErrorMessage('No prompt selected');
 				setState('error');
@@ -250,6 +250,62 @@ export function Cli({
 				setSuccessMessage(
 					`Successfully filled file: ${file.fileName}\nContent added from clipboard!`,
 				);
+			} else if (selectedAction?.id === 'select') {
+				if (!selectedPrompt) {
+					setErrorMessage('No prompt selected');
+					setState('error');
+					return;
+				}
+
+				// Parse the prompt template
+				const promptResult = await parsePromptToml(selectedPrompt.path);
+				if (promptResult.isErr()) {
+					setErrorMessage(promptResult.error.message);
+					setState('error');
+					return;
+				}
+
+				// Get the prompt version from file metadata
+				const unfilledFile = file as UnfilledFile;
+				const targetVersion = unfilledFile.prompt_version;
+
+				// Find the specific version content
+				const targetPrompt = promptResult.value.prompts.find(
+					(p) => p.version === targetVersion,
+				);
+
+				if (!targetPrompt) {
+					setErrorMessage(
+						`Prompt version ${targetVersion} not found in template`,
+					);
+					setState('error');
+					return;
+				}
+
+				// Process template with topic variable replacement
+				const processedResult = processTopicTemplate(
+					targetPrompt.content,
+					unfilledFile.topic,
+				);
+				if (processedResult.isErr()) {
+					setErrorMessage(processedResult.error.message);
+					setState('error');
+					return;
+				}
+
+				// Copy processed prompt content to clipboard
+				const clipboardResult = await setClipboardContent(
+					processedResult.value.content,
+				);
+				if (clipboardResult.isErr()) {
+					setErrorMessage(clipboardResult.error.message);
+					setState('error');
+					return;
+				}
+
+				setSuccessMessage(
+					`Successfully copied prompt (version ${targetVersion}) to clipboard!\nFile: ${file.fileName}`,
+				);
 			} else if (selectedAction?.id === 'reset') {
 				// Reset file content while preserving frontmatter
 				const resetResult = await clearFileContent(file.path);
@@ -358,6 +414,11 @@ export function Cli({
 			{ id: 'create', name: 'create', description: 'Create new topic file' },
 			{ id: 'fill', name: 'fill', description: 'Fill existing empty file' },
 			{
+				id: 'select',
+				name: 'select',
+				description: 'Select unfilled file and copy prompt to clipboard',
+			},
+			{
 				id: 'reset',
 				name: 'reset',
 				description: 'Reset file to empty state (keep frontmatter)',
@@ -387,7 +448,7 @@ export function Cli({
 		// Choose the appropriate file list based on selected action
 		let files: (UnfilledFile | OutputFile)[] = [];
 
-		if (selectedAction?.id === 'fill') {
+		if (selectedAction?.id === 'fill' || selectedAction?.id === 'select') {
 			files = unfilledFiles;
 		} else if (
 			selectedAction?.id === 'reset' ||
